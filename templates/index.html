@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Energy Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .card {
+            transition: transform 0.2s;
+            margin-bottom: 20px;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .status-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-active {
+            background-color: #28a745;
+        }
+        .status-inactive {
+            background-color: #dc3545;
+        }
+        .component-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-lightning-charge-fill"></i> Energy Dashboard
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <!-- Solar Panels Section -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-sun"></i> Solar Panels
+                        </h5>
+                        <div class="status-indicator status-active"></div>
+                        <span class="component-value" id="solar-power">0 kW</span>
+                        <p class="text-muted">Current Generation</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-warning" role="progressbar" style="width: 75%"></div>
+                        </div>
+                        <small class="text-muted">Daily Production: <span id="solar-daily">0 kWh</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Battery Section -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-battery-charging"></i> Battery
+                        </h5>
+                        <div class="status-indicator status-active"></div>
+                        <span class="component-value" id="battery-level">0%</span>
+                        <p class="text-muted">Current Charge</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 60%"></div>
+                        </div>
+                        <small class="text-muted">Capacity: <span id="battery-capacity">0 kWh</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inverter Section -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-lightning"></i> Inverter
+                        </h5>
+                        <div class="status-indicator status-active"></div>
+                        <span class="component-value" id="inverter-power">0 kW</span>
+                        <p class="text-muted">Current Output</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-info" role="progressbar" style="width: 45%"></div>
+                        </div>
+                        <small class="text-muted">Efficiency: <span id="inverter-efficiency">0%</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Electric Vehicle Section -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-car-front"></i> Electric Vehicle
+                        </h5>
+                        <div class="status-indicator status-inactive"></div>
+                        <span class="component-value" id="ev-battery">0%</span>
+                        <p class="text-muted">Battery Level</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-primary" role="progressbar" style="width: 30%"></div>
+                        </div>
+                        <small class="text-muted">Range: <span id="ev-range">0 km</span></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Control Panel</h5>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-primary" onclick="controlDevice('start_charging')">
+                                <i class="bi bi-battery-charging"></i> Start Charging
+                            </button>
+                            <button class="btn btn-warning" onclick="controlDevice('stop_charging')">
+                                <i class="bi bi-battery"></i> Stop Charging
+                            </button>
+                            <button class="btn btn-info" onclick="controlDevice('optimize_power')">
+                                <i class="bi bi-gear"></i> Optimize Power
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                updateDashboard(data);
+            } catch (error) {
+                console.error('Error fetching status:', error);
+            }
+        }
+
+        function updateDashboard(data) {
+            // Update solar panel data
+            document.getElementById('solar-power').textContent = `${data.solar?.power || 0} kW`;
+            document.getElementById('solar-daily').textContent = `${data.solar?.daily || 0} kWh`;
+
+            // Update battery data
+            document.getElementById('battery-level').textContent = `${data.battery?.level || 0}%`;
+            document.getElementById('battery-capacity').textContent = `${data.battery?.capacity || 0} kWh`;
+
+            // Update inverter data
+            document.getElementById('inverter-power').textContent = `${data.inverter?.power || 0} kW`;
+            document.getElementById('inverter-efficiency').textContent = `${data.inverter?.efficiency || 0}%`;
+
+            // Update EV data
+            document.getElementById('ev-battery').textContent = `${data.ev?.battery || 0}%`;
+            document.getElementById('ev-range').textContent = `${data.ev?.range || 0} km`;
+        }
+
+        async function controlDevice(command) {
+            try {
+                const response = await fetch('/api/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    fetchStatus(); // Refresh the dashboard
+                }
+            } catch (error) {
+                console.error('Error controlling device:', error);
+            }
+        }
+
+        // Initial fetch
+        fetchStatus();
+        // Update every 30 seconds
+        setInterval(fetchStatus, 30000);
+    </script>
+</body>
+</html> 
