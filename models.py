@@ -4,18 +4,23 @@ from datetime import datetime
 db = SQLAlchemy()
 
 class SolarData(db.Model):
+    __tablename__ = 'solar_data'
+    
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    power = db.Column(db.Float)  # kW
-    daily_production = db.Column(db.Float)  # kWh
-    efficiency = db.Column(db.Float)  # %
+    power = db.Column(db.Float)  # Current power in watts
+    daily_yield = db.Column(db.Float)  # kWh
+    
+    def __repr__(self):
+        return f'<SolarData {self.timestamp}: {self.power}W>'
 
 class BatteryData(db.Model):
+    __tablename__ = 'battery_data'
+    
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    charge_level = db.Column(db.Float)  # %
-    power_flow = db.Column(db.Float)  # kW (positive for charging, negative for discharging)
-    temperature = db.Column(db.Float)  # °C
+    soc = db.Column(db.Float)  # State of charge (0-100)
+    power = db.Column(db.Float)  # Charge/discharge power (W)
 
 class InverterData(db.Model):
     id = db.Column(db.Integer, primary_key=True)
