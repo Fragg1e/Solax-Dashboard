@@ -38,10 +38,16 @@ logger.addHandler(file_handler)
 app = Flask(__name__)
 
 # Database configuration
-database_url = os.getenv('DATABASE_URL', 'sqlite:///solax.db')
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///instance/solax.db').replace(
+    'postgres://', 'postgresql://', 1
+)
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'pool_timeout': 30,
+    'pool_size': 10,
+    'max_overflow': 20
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -266,12 +272,13 @@ def get_mock_data():
     return data
 
 @app.before_request
-def check_db():
+def verify_db_connection():
     try:
-        db.session.execute("SELECT 1")
+        db.session.execute('SELECT 1')
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': 'Database unavailable'}), 500
+        app.logger.error(f"Database connection failed: {str(e)}")
+        return jsonify({'error': 'Database unavailable', 'details': str(e)}), 503
 
 @app.route('/')
 def home():
@@ -448,6 +455,9 @@ def query_historical_data(component, hours):
     except Exception as e:
         app.logger.error(f"Query error: {str(e)}")
         raise  # This will trigger the 500 handler
+
+# Check your current database URI
+print(f"Current database URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
 
 if __name__ == '__main__':
     # Get port from environment variable or default to 5000
