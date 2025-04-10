@@ -2,6 +2,7 @@ services:
   - type: web
     name: solax-dashboard
     env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
