@@ -13,6 +13,7 @@ import requests
 import json
 from solax_client import SolaxClient
 import math
+from flask_sqlalchemy import SQLAlchemy
 
 # Load environment variables
 load_dotenv()
@@ -35,30 +36,25 @@ logger.addHandler(file_handler)
 
 app = Flask(__name__)
 
-# Configure SQLite database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///solax_data.db'
+# Database configuration
+database_url = os.getenv('DATABASE_URL', 'sqlite:///solax.db')
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize database
-db.init_app(app)
+db = SQLAlchemy(app)
 
-# Create database tables
-with app.app_context():
-    db.create_all()
+# Initialize Solax client
+solax_client = SolaxClient(
+    token_id=os.getenv('SOLAX_TOKEN_ID'),
+    wifi_sn=os.getenv('SOLAX_WIFI_SN')
+)
 
 # Weather API configuration
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', 'your_api_key_here')
 WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/forecast"
 DEFAULT_LOCATION = "London,UK"  # Default location if none is provided
-
-# Initialize Solax client
-solax_client = SolaxClient(
-    token_id=os.getenv('SOLAX_TOKEN_ID'),
-    base_url="https://www.solaxcloud.com/api/v2"
-)
-
-# Get WiFi SN from environment
-WIFI_SN = os.getenv('SOLAX_WIFI_SN')
 
 def get_weather_data(location=DEFAULT_LOCATION):
     """Fetch weather forecast data from OpenWeatherMap API.
@@ -178,7 +174,7 @@ def get_real_data():
     """Get real data from the Solax system."""
     try:
         # Get real-time data from Solax
-        response = solax_client.get_realtime_data(WIFI_SN)
+        response = solax_client.get_realtime_data()
         
         if not response["success"]:
             logger.error(f"Failed to get real-time data: {response['exception']}")

@@ -16,4 +16,12 @@ services:
       - key: WEATHER_API_KEY
         sync: false
       - key: DATABASE_URL
-        value: sqlite:///solax_data.db 
+        fromDatabase:
+          name: solax-db
+          property: connectionString
+
+databases:
+  - name: solax-db
+    databaseName: solax
+    user: solax
+    plan: free 
