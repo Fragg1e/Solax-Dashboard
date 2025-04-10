@@ -7,28 +7,19 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Initialize Solax client only
-solax_client = SolaxClient(
-    token_id=os.getenv('SOLAX_TOKEN_ID'),
-    wifi_sn=os.getenv('SOLAX_WIFI_SN')
-)
+# Initialize client exactly like in test_solax.py
+solax_client = SolaxClient(token_id=os.getenv('SOLAX_TOKEN_ID'))
 
-@app.route('/api/status')
-def get_status():
+@app.route('/')
+def status():
     try:
-        # Get real-time data only
-        data = solax_client.get_realtime_data()
-        return jsonify({
-            'status': 'online',
-            'data': data
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/live')
-def get_live_data():
-    try:
-        return jsonify(solax_client.get_realtime_data())
+        wifi_sn = os.getenv('SOLAX_WIFI_SN')
+        if not wifi_sn:
+            return jsonify({'error': 'SOLAX_WIFI_SN not configured'}), 500
+            
+        data = solax_client.get_realtime_data(wifi_sn)
+        return jsonify(data)
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
