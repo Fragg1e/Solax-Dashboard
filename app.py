@@ -21,7 +21,7 @@ def dashboard():
         if not data.get('success'):
             return render_template('error.html', message=data.get('exception', 'API Error'))
             
-        return render_template('dashboard.html', 
+        return render_template('index.html', 
             ac_power=data['result']['acpower'],
             yield_today=data['result']['yieldtoday'],
             battery_soc=data['result']['soc'],
