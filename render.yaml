@@ -7,11 +7,13 @@ services:
     envVars:
       - key: FLASK_ENV
         value: production
-      - key: SOLAX_API_KEY
+      - key: FLASK_APP
+        value: app.py
+      - key: SOLAX_TOKEN_ID
         sync: false
-      - key: BATTERY_API_KEY
+      - key: SOLAX_WIFI_SN
         sync: false
-      - key: INVERTER_API_KEY
+      - key: WEATHER_API_KEY
         sync: false
-      - key: EV_API_KEY
-        sync: false 
+      - key: DATABASE_URL
+        value: sqlite:///solax_data.db 

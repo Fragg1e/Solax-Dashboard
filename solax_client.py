@@ -11,14 +11,14 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 class SolaxClient:
-    """Client for interacting with Solax API v2.0."""
+    """Client for interacting with Solax API."""
     
-    def __init__(self, token_id=None, base_url="https://api.solaxcloud.com"):
+    def __init__(self, token_id=None, base_url="https://www.solaxcloud.com/api/v1"):
         """Initialize the Solax client.
         
         Args:
             token_id (str, optional): Solax API token ID. Defaults to None.
-            base_url (str, optional): Base URL for the Solax API. Defaults to "https://api.solaxcloud.com".
+            base_url (str, optional): Base URL for the Solax API. Defaults to "https://www.solaxcloud.com/api/v1".
         """
         self.token_id = token_id or os.environ.get('SOLAX_TOKEN_ID')
         if not self.token_id:
@@ -26,10 +26,6 @@ class SolaxClient:
             
         self.base_url = base_url.rstrip('/')
         self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'tokenId': self.token_id
-        })
     
     def get_system_info(self):
         """Get information about the Solax system.
@@ -61,38 +57,16 @@ class SolaxClient:
             wifi_sn (str): WiFi module serial number (registration number)
             
         Returns:
-            dict: Response containing:
-                success (bool): true=successful, false=unsuccessful
-                exception (str): Error message
-                result (dict): Real-time data including:
-                    - inverterSN: Inverter serial number
-                    - sn: WiFi module serial number
-                    - acpower: AC output power (W)
-                    - yieldtoday: Today's yield (kWh)
-                    - yieldtotal: Total yield (kWh)
-                    - feedinpower: Power supplied to the grid (W)
-                    - feedinenergy: Total grid export power (kWh)
-                    - consumeenergy: Total grid import power (kWh)
-                    - feedinpowerM2: Meter 2 power (W)
-                    - soc: Battery capacity (%)
-                    - peps1: EPS A phase active power (W)
-                    - peps2: EPS B phase active power (W)
-                    - peps3: EPS C phase active power (W)
-                    - inverterType: Inverter type
-                    - inverterStatus: Inverter operating conditions
-                    - uploadTime: Upload time (format: YYYY-MM-DD HH:MM:SS)
-                    - batPower: Battery terminal power (W)
-                    - powerdc1: PV1 input power (W)
-                    - powerdc2: PV2 input power (W)
-                    - powerdc3: PV3 input power (W)
-                    - powerdc4: PV4 input power (W)
-                    - batStatus: Battery status (0=normal, 1=fault, 2=disconnected)
-                code (int): Status code (0=Success, see error codes for others)
+            dict: Response containing real-time data
         """
         try:
-            response = self.session.post(
-                f"{self.base_url}/api/v2/dataAccess/realtimeInfo/get",
-                json={"wifiSn": wifi_sn}
+            params = {
+                "tokenId": self.token_id,
+                "sn": wifi_sn
+            }
+            response = self.session.get(
+                f"{self.base_url}/realTimeData.do",
+                params=params
             )
             response.raise_for_status()
             return response.json()

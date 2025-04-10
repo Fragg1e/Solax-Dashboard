@@ -12,6 +12,7 @@ import io
 import requests
 import json
 from solax_client import SolaxClient
+import math
 
 # Load environment variables
 load_dotenv()
@@ -34,9 +35,11 @@ logger.addHandler(file_handler)
 
 app = Flask(__name__)
 
-# Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///solax.db')
+# Configure SQLite database
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///solax_data.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize database
 db.init_app(app)
 
 # Create database tables
@@ -51,29 +54,61 @@ DEFAULT_LOCATION = "London,UK"  # Default location if none is provided
 # Initialize Solax client
 solax_client = SolaxClient(
     token_id=os.getenv('SOLAX_TOKEN_ID'),
-    base_url="https://api.solaxcloud.com"
+    base_url="https://www.solaxcloud.com/api/v1"
 )
 
 # Get WiFi SN from environment
 WIFI_SN = os.getenv('SOLAX_WIFI_SN')
 
 def get_weather_data(location=DEFAULT_LOCATION):
-    """Fetch weather forecast data from OpenWeatherMap API."""
+    """Fetch weather forecast data from OpenWeatherMap API.
+    
+    Args:
+        location (str): City name and country code divided by comma (e.g. London,UK)
+        
+    Returns:
+        dict: Weather forecast data or None if request fails
+    """
     try:
         params = {
             'q': location,
             'appid': WEATHER_API_KEY,
-            'units': 'metric'  # Use metric units
+            'units': 'metric',  # Use metric units
+            'cnt': 40  # Maximum number of timestamps (5 days with 3-hour steps)
         }
-        response = requests.get(WEATHER_API_URL, params=params)
+        response = requests.get(WEATHER_API_URL, params=params, timeout=10)
+        
+        # Check for rate limiting
+        if response.status_code == 429:
+            logger.error("OpenWeatherMap API rate limit exceeded")
+            return None
+            
         response.raise_for_status()
         return response.json()
-    except Exception as e:
+    except requests.exceptions.Timeout:
+        logger.error("Timeout while fetching weather data")
+        return None
+    except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching weather data: {str(e)}")
         return None
 
 def predict_solar_power(weather_data):
-    """Predict solar power generation based on weather forecast."""
+    """Predict solar power generation based on weather forecast.
+    
+    Uses multiple weather parameters to make a more accurate prediction:
+    - Cloud coverage
+    - Solar radiation (if available)
+    - Temperature
+    - Weather condition
+    - Time of day
+    - Season
+    
+    Args:
+        weather_data (dict): Weather forecast data from OpenWeatherMap API
+        
+    Returns:
+        list: Predicted solar power generation for each timestamp
+    """
     if not weather_data or 'list' not in weather_data:
         return []
     
@@ -82,28 +117,59 @@ def predict_solar_power(weather_data):
     # Base solar capacity (in kW) - adjust based on your system
     base_capacity = 5.0
     
+    # Get location data for calculating day length
+    lat = weather_data.get('city', {}).get('coord', {}).get('lat', 51.5)  # Default to London
+    lon = weather_data.get('city', {}).get('coord', {}).get('lon', -0.13)
+    
     for item in weather_data['list']:
         timestamp = datetime.fromtimestamp(item['dt'])
         
-        # Get cloud coverage percentage
-        clouds = item.get('clouds', {}).get('all', 50)
+        # Get weather parameters
+        clouds = item.get('clouds', {}).get('all', 50)  # Cloud coverage %
+        temp = item.get('main', {}).get('temp', 20)  # Temperature in Celsius
+        weather_id = item.get('weather', [{}])[0].get('id', 800)  # Weather condition ID
         
-        # Calculate solar power based on cloud coverage
-        # Simple model: power = base_capacity * (1 - cloud_coverage/100)
-        # This is a simplified model - real solar prediction would use more factors
-        power = base_capacity * (1 - clouds/100)
+        # Calculate power reduction factors
         
-        # Adjust for time of day (no power at night)
+        # 1. Cloud coverage factor (0.2 to 1.0)
+        cloud_factor = 1.0 - (clouds * 0.8 / 100)
+        
+        # 2. Temperature factor (panels are most efficient around 25°C)
+        # Efficiency drops by about 0.4% per degree above 25°C
+        temp_factor = 1.0 - max(0, (temp - 25) * 0.004)
+        
+        # 3. Weather condition factor
+        weather_factor = 1.0
+        if weather_id < 600:  # Rain
+            weather_factor = 0.3
+        elif weather_id < 700:  # Snow
+            weather_factor = 0.1
+        elif weather_id < 800:  # Atmosphere (mist, fog, etc)
+            weather_factor = 0.5
+        
+        # 4. Time of day factor (simple cosine function)
         hour = timestamp.hour
-        if hour < 6 or hour > 18:  # Assume no solar power outside these hours
-            power = 0
+        if hour < 6 or hour > 18:  # Night time
+            time_factor = 0
+        else:
+            time_factor = math.cos((hour - 12) * math.pi / 12) * 0.5 + 0.5
+        
+        # Calculate final power
+        power = base_capacity * cloud_factor * temp_factor * weather_factor * time_factor
         
         predictions.append({
             'timestamp': timestamp.isoformat(),
             'power': round(power, 2),
             'clouds': clouds,
-            'temperature': item.get('main', {}).get('temp', 0),
-            'weather': item.get('weather', [{}])[0].get('description', '')
+            'temperature': temp,
+            'weather_condition': item.get('weather', [{}])[0].get('description', ''),
+            'weather_id': weather_id,
+            'factors': {
+                'cloud_factor': round(cloud_factor, 2),
+                'temp_factor': round(temp_factor, 2),
+                'weather_factor': round(weather_factor, 2),
+                'time_factor': round(time_factor, 2)
+            }
         })
     
     return predictions
