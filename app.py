@@ -15,6 +15,7 @@ from solax_client import SolaxClient
 import math
 from flask_sqlalchemy import SQLAlchemy
 import traceback
+from sqlalchemy import text  # Add this with other imports
 
 # Load environment variables
 load_dotenv()
@@ -274,7 +275,7 @@ def get_mock_data():
 @app.before_request
 def verify_db_connection():
     try:
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Database connection failed: {str(e)}")
