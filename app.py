@@ -48,7 +48,7 @@ db = SQLAlchemy(app)
 # Initialize Solax client
 solax_client = SolaxClient(
     token_id=os.getenv('SOLAX_TOKEN_ID'),
-    serial_number=os.getenv('SOLAX_WIFI_SN')
+    wifi_sn=os.getenv('SOLAX_WIFI_SN')
 )
 
 # Weather API configuration
