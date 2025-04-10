@@ -54,7 +54,7 @@ DEFAULT_LOCATION = "London,UK"  # Default location if none is provided
 # Initialize Solax client
 solax_client = SolaxClient(
     token_id=os.getenv('SOLAX_TOKEN_ID'),
-    base_url="https://www.solaxcloud.com/api/v1"
+    base_url="https://www.solaxcloud.com/api/v2"
 )
 
 # Get WiFi SN from environment
