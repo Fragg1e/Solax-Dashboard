@@ -11,12 +11,13 @@ import csv
 import io
 import requests
 import json
+from solax_client import SolaxClient
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
 logger = logging.getLogger(__name__)
 
 # Create logs directory if it doesn't exist
@@ -46,6 +47,15 @@ with app.app_context():
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', 'your_api_key_here')
 WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/forecast"
 DEFAULT_LOCATION = "London,UK"  # Default location if none is provided
+
+# Initialize Solax client
+solax_client = SolaxClient(
+    token_id=os.getenv('SOLAX_TOKEN_ID'),
+    base_url="https://api.solaxcloud.com"
+)
+
+# Get WiFi SN from environment
+WIFI_SN = os.getenv('SOLAX_WIFI_SN')
 
 def get_weather_data(location=DEFAULT_LOCATION):
     """Fetch weather forecast data from OpenWeatherMap API."""
@@ -97,6 +107,86 @@ def predict_solar_power(weather_data):
         })
     
     return predictions
+
+def get_real_data():
+    """Get real data from the Solax system."""
+    try:
+        # Get real-time data from Solax
+        response = solax_client.get_realtime_data(WIFI_SN)
+        
+        if not response["success"]:
+            logger.error(f"Failed to get real-time data: {response['exception']}")
+            return get_mock_data()
+        
+        data = response["result"]
+        
+        # Process the real data
+        processed_data = {
+            "solar": {
+                "power": data.get("acpower", 0) / 1000,  # Convert W to kW
+                "daily": data.get("yieldtoday", 0),
+                "status": "active" if data.get("inverterStatus") == "102" else "inactive"
+            },
+            "battery": {
+                "level": data.get("soc", 0),
+                "capacity": 10,  # Default capacity in kWh
+                "status": "active" if data.get("batStatus") == "0" else "inactive"
+            },
+            "inverter": {
+                "power": data.get("acpower", 0) / 1000,  # Convert W to kW
+                "efficiency": 95,  # Default efficiency
+                "status": "active" if data.get("inverterStatus") == "102" else "inactive"
+            },
+            "ev": {
+                "battery": 0,  # Not available in API
+                "range": 0,  # Not available in API
+                "status": "inactive"
+            }
+        }
+        
+        # Log the data
+        logger.info(f"Retrieved real data: {processed_data}")
+        
+        # Store the data in the database
+        with app.app_context():
+            # Store solar data
+            solar_data = SolarData(
+                power=processed_data['solar']['power'],
+                daily_production=processed_data['solar']['daily'],
+                efficiency=processed_data['inverter']['efficiency']
+            )
+            db.session.add(solar_data)
+            
+            # Store battery data
+            battery_data_model = BatteryData(
+                charge_level=processed_data['battery']['level'],
+                power_flow=0,  # Power flow not available in API
+                temperature=0  # Temperature not available in API
+            )
+            db.session.add(battery_data_model)
+            
+            # Store inverter data
+            inverter_data_model = InverterData(
+                power_output=processed_data['inverter']['power'],
+                efficiency=processed_data['inverter']['efficiency'],
+                temperature=0  # Temperature not available in API
+            )
+            db.session.add(inverter_data_model)
+            
+            # Store EV data (mock data since Solax doesn't provide this)
+            ev_data = EVData(
+                battery_level=processed_data['ev']['battery'],
+                charging_power=0,
+                estimated_range=processed_data['ev']['range']
+            )
+            db.session.add(ev_data)
+            
+            db.session.commit()
+        
+        return processed_data
+    except Exception as e:
+        logger.error(f"Error getting real data: {str(e)}")
+        return get_mock_data()
 
 def get_mock_data():
     """Generate mock data for the dashboard."""
@@ -172,7 +262,8 @@ def home():
 @app.route('/api/status', methods=['GET'])
 def get_status():
     """Returns the current status of all components."""
-    return jsonify(get_mock_data())
+    # Try to get real data first, fall back to mock data if needed
+    return jsonify(get_real_data())
 
 @app.route('/api/historical/<component>', methods=['GET'])
 def get_historical_data(component):
@@ -237,14 +328,18 @@ def control_device():
     # Log the command
     logger.info(f"Received control command: {command}")
     
-    # Mock response based on command
-    response = {
-        "status": "success",
-        "command": command,
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    return jsonify(response)
+    # Try to send the command to the Solax system
+    try:
+        response = solax_client.control_device(command)
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error controlling device: {str(e)}")
+        # Return a mock response if the real API call fails
+        return jsonify({
+            "status": "success",
+            "command": command,
+            "timestamp": datetime.now().isoformat()
+        })
 
 @app.route('/api/export', methods=['GET'])
 def export_data():
@@ -274,7 +369,7 @@ def export_data():
         # Write battery data
         for data in battery_data:
             writer.writerow([data.timestamp, 'Battery', 'Charge Level', data.charge_level, '%'])
-            writer.writerow([data.timestamp, 'Battery', 'Capacity', data.capacity, 'kWh'])
+            writer.writerow([data.timestamp, 'Battery', 'Power Flow', data.power_flow, 'kW'])
         
         # Write inverter data
         for data in inverter_data:

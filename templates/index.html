@@ -4,16 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solax Energy Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.24.1/plotly.min.js"></script>
     <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
         .card {
-            transition: transform 0.2s;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
+            transition: transform 0.3s ease;
         }
         .card:hover {
             transform: translateY(-5px);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 15px 20px;
+        }
+        .card-body {
+            padding: 20px;
         }
         .status-indicator {
             width: 15px;
@@ -28,490 +49,363 @@
         .status-inactive {
             background-color: #dc3545;
         }
-        .component-value {
-            font-size: 1.5rem;
+        .metric-value {
+            font-size: 24px;
             font-weight: bold;
+            color: #212529;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #6c757d;
         }
         .graph-container {
             height: 300px;
+            margin-top: 20px;
+        }
+        .time-range-selector {
             margin-bottom: 20px;
         }
-        .time-selector {
+        .export-button {
             margin-bottom: 20px;
-        }
-        .weather-icon {
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
-        .forecast-card {
-            text-align: center;
-            padding: 10px;
-        }
-        .forecast-time {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .forecast-temp {
-            font-size: 1.2rem;
-        }
-        .location-input {
-            max-width: 300px;
         }
     </style>
 </head>
-<body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="bi bi-lightning-charge-fill"></i> Solax Energy Dashboard
-            </a>
-        </div>
-    </nav>
-
-    <div class="container mt-4">
-        <!-- Location Selector -->
+<body>
+    <div class="dashboard-container">
+        <h1 class="mb-4">Solax Energy Dashboard</h1>
+        
         <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">Location</h5>
-                        <div class="input-group location-input">
-                            <input type="text" class="form-control" id="location-input" placeholder="Enter city, country" value="London,UK">
-                            <button class="btn btn-primary" onclick="updateLocation()">
-                                <i class="bi bi-search"></i> Update
-                            </button>
-                        </div>
-                    </div>
+            <div class="col-md-6">
+                <div class="time-range-selector">
+                    <label for="timeRange" class="form-label">Time Range:</label>
+                    <select id="timeRange" class="form-select">
+                        <option value="1">Last Hour</option>
+                        <option value="6">Last 6 Hours</option>
+                        <option value="24" selected>Last 24 Hours</option>
+                        <option value="168">Last 7 Days</option>
+                        <option value="720">Last 30 Days</option>
+                    </select>
                 </div>
             </div>
-        </div>
-
-        <!-- Weather Forecast -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="bi bi-cloud-sun"></i> Weather Forecast
-                        </h5>
-                        <div class="row" id="weather-forecast">
-                            <!-- Weather forecast cards will be inserted here -->
-                            <div class="col-12 text-center">
-                                <p>Loading weather data...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-md-6 text-end">
+                <button id="exportButton" class="btn btn-primary export-button">
+                    <i class="bi bi-download"></i> Export Data
+                </button>
             </div>
         </div>
-
-        <!-- Time Range Selector -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">Time Range</h5>
-                        <div class="btn-group time-selector" role="group">
-                            <button class="btn btn-outline-primary" onclick="updateTimeRange(1)">1 Hour</button>
-                            <button class="btn btn-outline-primary" onclick="updateTimeRange(6)">6 Hours</button>
-                            <button class="btn btn-outline-primary" onclick="updateTimeRange(24)">24 Hours</button>
-                            <button class="btn btn-outline-primary" onclick="updateTimeRange(168)">7 Days</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        
         <div class="row">
-            <!-- Solar Panels Section -->
             <div class="col-md-6 col-lg-3">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="bi bi-sun"></i> Solar Panels
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <span id="solarStatus" class="status-indicator status-inactive"></span>
+                            Solar Panels
                         </h5>
-                        <div class="status-indicator status-active"></div>
-                        <span class="component-value" id="solar-power">0 kW</span>
-                        <p class="text-muted">Current Generation</p>
-                        <div class="progress mb-2">
-                            <div class="progress-bar bg-warning" role="progressbar" style="width: 75%"></div>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="metric-value" id="solarPower">0 kW</div>
+                            <div class="metric-label">Current Power</div>
                         </div>
-                        <small class="text-muted">Daily Production: <span id="solar-daily">0 kWh</span></small>
-                    </div>
-                </div>
-                <div class="card shadow mt-3">
-                    <div class="card-body">
-                        <h6 class="card-title">Power Generation History</h6>
-                        <div id="solar-graph" class="graph-container"></div>
-                    </div>
-                </div>
-                <div class="card shadow mt-3">
-                    <div class="card-body">
-                        <h6 class="card-title">Solar Power Prediction</h6>
-                        <div id="solar-prediction-graph" class="graph-container"></div>
+                        <div class="mb-3">
+                            <div class="metric-value" id="solarDaily">0 kWh</div>
+                            <div class="metric-label">Daily Production</div>
+                        </div>
+                        <div id="solarGraph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
-
-            <!-- Battery Section -->
+            
             <div class="col-md-6 col-lg-3">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="bi bi-battery-charging"></i> Battery
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <span id="batteryStatus" class="status-indicator status-inactive"></span>
+                            Battery
                         </h5>
-                        <div class="status-indicator status-active"></div>
-                        <span class="component-value" id="battery-level">0%</span>
-                        <p class="text-muted">Current Charge</p>
-                        <div class="progress mb-2">
-                            <div class="progress-bar bg-success" role="progressbar" style="width: 60%"></div>
-                        </div>
-                        <small class="text-muted">Capacity: <span id="battery-capacity">0 kWh</span></small>
                     </div>
-                </div>
-                <div class="card shadow mt-3">
                     <div class="card-body">
-                        <h6 class="card-title">Charge Level History</h6>
-                        <div id="battery-graph" class="graph-container"></div>
+                        <div class="mb-3">
+                            <div class="metric-value" id="batteryLevel">0%</div>
+                            <div class="metric-label">Charge Level</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="metric-value" id="batteryCapacity">0 kWh</div>
+                            <div class="metric-label">Capacity</div>
+                        </div>
+                        <div id="batteryGraph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
-
-            <!-- Inverter Section -->
+            
             <div class="col-md-6 col-lg-3">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="bi bi-lightning"></i> Inverter
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <span id="inverterStatus" class="status-indicator status-inactive"></span>
+                            Inverter
                         </h5>
-                        <div class="status-indicator status-active"></div>
-                        <span class="component-value" id="inverter-power">0 kW</span>
-                        <p class="text-muted">Current Output</p>
-                        <div class="progress mb-2">
-                            <div class="progress-bar bg-info" role="progressbar" style="width: 45%"></div>
-                        </div>
-                        <small class="text-muted">Efficiency: <span id="inverter-efficiency">0%</span></small>
                     </div>
-                </div>
-                <div class="card shadow mt-3">
                     <div class="card-body">
-                        <h6 class="card-title">Efficiency History</h6>
-                        <div id="inverter-graph" class="graph-container"></div>
+                        <div class="mb-3">
+                            <div class="metric-value" id="inverterPower">0 kW</div>
+                            <div class="metric-label">Power Output</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="metric-value" id="inverterEfficiency">0%</div>
+                            <div class="metric-label">Efficiency</div>
+                        </div>
+                        <div id="inverterGraph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
-
-            <!-- Electric Vehicle Section -->
+            
             <div class="col-md-6 col-lg-3">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="bi bi-car-front"></i> Electric Vehicle
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <span id="evStatus" class="status-indicator status-inactive"></span>
+                            Electric Vehicle
                         </h5>
-                        <div class="status-indicator status-inactive"></div>
-                        <span class="component-value" id="ev-battery">0%</span>
-                        <p class="text-muted">Battery Level</p>
-                        <div class="progress mb-2">
-                            <div class="progress-bar bg-primary" role="progressbar" style="width: 30%"></div>
-                        </div>
-                        <small class="text-muted">Range: <span id="ev-range">0 km</span></small>
                     </div>
-                </div>
-                <div class="card shadow mt-3">
                     <div class="card-body">
-                        <h6 class="card-title">Battery Level History</h6>
-                        <div id="ev-graph" class="graph-container"></div>
+                        <div class="mb-3">
+                            <div class="metric-value" id="evBattery">0%</div>
+                            <div class="metric-label">Battery Level</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="metric-value" id="evRange">0 km</div>
+                            <div class="metric-label">Estimated Range</div>
+                        </div>
+                        <div id="evGraph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Control Panel -->
+        
         <div class="row mt-4">
-            <div class="col-12">
-                <div class="card shadow">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Weather Forecast</h5>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Control Panel</h5>
-                        <div class="btn-group" role="group">
-                            <button class="btn btn-primary" onclick="controlDevice('start_charging')">
-                                <i class="bi bi-battery-charging"></i> Start Charging
-                            </button>
-                            <button class="btn btn-warning" onclick="controlDevice('stop_charging')">
-                                <i class="bi bi-battery"></i> Stop Charging
-                            </button>
-                            <button class="btn btn-info" onclick="controlDevice('optimize_power')">
-                                <i class="bi bi-gear"></i> Optimize Power
-                            </button>
-                            <button class="btn btn-success" onclick="exportData()">
-                                <i class="bi bi-download"></i> Export Data
-                            </button>
-                        </div>
+                        <div id="weatherGraph" class="graph-container"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Solar Power Prediction</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="solarPredictionGraph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
-        let currentTimeRange = 24; // Default to 24 hours
-        let currentLocation = "London,UK"; // Default location
-
-        async function fetchStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                updateDashboard(data);
-            } catch (error) {
-                console.error('Error fetching status:', error);
-            }
+        // Function to update the dashboard with real-time data
+        function updateDashboard() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update solar panel data
+                    document.getElementById('solarPower').textContent = `${data.solar.power} kW`;
+                    document.getElementById('solarDaily').textContent = `${data.solar.daily} kWh`;
+                    document.getElementById('solarStatus').className = `status-indicator status-${data.solar.status}`;
+                    
+                    // Update battery data
+                    document.getElementById('batteryLevel').textContent = `${data.battery.level}%`;
+                    document.getElementById('batteryCapacity').textContent = `${data.battery.capacity} kWh`;
+                    document.getElementById('batteryStatus').className = `status-indicator status-${data.battery.status}`;
+                    
+                    // Update inverter data
+                    document.getElementById('inverterPower').textContent = `${data.inverter.power} kW`;
+                    document.getElementById('inverterEfficiency').textContent = `${data.inverter.efficiency}%`;
+                    document.getElementById('inverterStatus').className = `status-indicator status-${data.inverter.status}`;
+                    
+                    // Update EV data
+                    document.getElementById('evBattery').textContent = `${data.ev.battery}%`;
+                    document.getElementById('evRange').textContent = `${data.ev.range} km`;
+                    document.getElementById('evStatus').className = `status-indicator status-${data.ev.status}`;
+                })
+                .catch(error => console.error('Error fetching status:', error));
         }
-
-        async function fetchHistoricalData(component) {
-            try {
-                const response = await fetch(`/api/historical/${component}?hours=${currentTimeRange}`);
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error(`Error fetching ${component} historical data:`, error);
-                return [];
-            }
+        
+        // Function to update historical data graphs
+        function updateHistoricalGraphs() {
+            const timeRange = document.getElementById('timeRange').value;
+            
+            // Update solar graph
+            fetch(`/api/historical/solar?hours=${timeRange}`)
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.map(d => new Date(d.timestamp));
+                    const power = data.map(d => d.power);
+                    
+                    Plotly.newPlot('solarGraph', [{
+                        x: timestamps,
+                        y: power,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Solar Power'
+                    }], {
+                        title: 'Solar Power Over Time',
+                        xaxis: { title: 'Time' },
+                        yaxis: { title: 'Power (kW)' }
+                    });
+                })
+                .catch(error => console.error('Error fetching solar data:', error));
+            
+            // Update battery graph
+            fetch(`/api/historical/battery?hours=${timeRange}`)
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.map(d => new Date(d.timestamp));
+                    const chargeLevel = data.map(d => d.charge_level);
+                    
+                    Plotly.newPlot('batteryGraph', [{
+                        x: timestamps,
+                        y: chargeLevel,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Battery Level'
+                    }], {
+                        title: 'Battery Level Over Time',
+                        xaxis: { title: 'Time' },
+                        yaxis: { title: 'Charge Level (%)' }
+                    });
+                })
+                .catch(error => console.error('Error fetching battery data:', error));
+            
+            // Update inverter graph
+            fetch(`/api/historical/inverter?hours=${timeRange}`)
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.map(d => new Date(d.timestamp));
+                    const powerOutput = data.map(d => d.power_output);
+                    
+                    Plotly.newPlot('inverterGraph', [{
+                        x: timestamps,
+                        y: powerOutput,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Inverter Power'
+                    }], {
+                        title: 'Inverter Power Over Time',
+                        xaxis: { title: 'Time' },
+                        yaxis: { title: 'Power (kW)' }
+                    });
+                })
+                .catch(error => console.error('Error fetching inverter data:', error));
+            
+            // Update EV graph
+            fetch(`/api/historical/ev?hours=${timeRange}`)
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.map(d => new Date(d.timestamp));
+                    const batteryLevel = data.map(d => d.battery_level);
+                    
+                    Plotly.newPlot('evGraph', [{
+                        x: timestamps,
+                        y: batteryLevel,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'EV Battery Level'
+                    }], {
+                        title: 'EV Battery Level Over Time',
+                        xaxis: { title: 'Time' },
+                        yaxis: { title: 'Battery Level (%)' }
+                    });
+                })
+                .catch(error => console.error('Error fetching EV data:', error));
         }
-
-        async function fetchWeatherData() {
-            try {
-                const response = await fetch(`/api/weather?location=${encodeURIComponent(currentLocation)}`);
-                const data = await response.json();
-                updateWeatherForecast(data);
-                return data;
-            } catch (error) {
-                console.error('Error fetching weather data:', error);
-                return null;
-            }
+        
+        // Function to update weather and solar prediction graphs
+        function updateWeatherAndPrediction() {
+            // Update weather graph
+            fetch('/api/weather')
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.list.map(d => new Date(d.dt * 1000));
+                    const temperatures = data.list.map(d => d.main.temp);
+                    const clouds = data.list.map(d => d.clouds.all);
+                    
+                    Plotly.newPlot('weatherGraph', [
+                        {
+                            x: timestamps,
+                            y: temperatures,
+                            type: 'scatter',
+                            mode: 'lines',
+                            name: 'Temperature'
+                        },
+                        {
+                            x: timestamps,
+                            y: clouds,
+                            type: 'scatter',
+                            mode: 'lines',
+                            name: 'Cloud Coverage',
+                            yaxis: 'y2'
+                        }
+                    ], {
+                        title: 'Weather Forecast',
+                        xaxis: { title: 'Time' },
+                        yaxis: { title: 'Temperature (°C)' },
+                        yaxis2: {
+                            title: 'Cloud Coverage (%)',
+                            overlaying: 'y',
+                            side: 'right'
+                        }
+                    });
+                })
+                .catch(error => console.error('Error fetching weather data:', error));
+            
+            // Update solar prediction graph
+            fetch('/api/solar-prediction')
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.map(d => new Date(d.timestamp));
+                    const power = data.map(d => d.power);
+                    
+                    Plotly.newPlot('solarPredictionGraph', [{
+                        x: timestamps,
+                        y: power,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Predicted Solar Power'
+                    }], {
+                        title: 'Solar Power Prediction',
+                        xaxis: { title: 'Time' },
+                        yaxis: { title: 'Power (kW)' }
+                    });
+                })
+                .catch(error => console.error('Error fetching solar prediction:', error));
         }
-
-        async function fetchSolarPrediction() {
-            try {
-                const response = await fetch(`/api/solar-prediction?location=${encodeURIComponent(currentLocation)}`);
-                const data = await response.json();
-                updateSolarPrediction(data);
-                return data;
-            } catch (error) {
-                console.error('Error fetching solar prediction:', error);
-                return [];
-            }
+        
+        // Function to export data
+        function exportData() {
+            const timeRange = document.getElementById('timeRange').value;
+            window.location.href = `/api/export?hours=${timeRange}`;
         }
-
-        function updateDashboard(data) {
-            // Update solar panel data
-            document.getElementById('solar-power').textContent = `${data.solar?.power || 0} kW`;
-            document.getElementById('solar-daily').textContent = `${data.solar?.daily || 0} kWh`;
-
-            // Update battery data
-            document.getElementById('battery-level').textContent = `${data.battery?.level || 0}%`;
-            document.getElementById('battery-capacity').textContent = `${data.battery?.capacity || 0} kWh`;
-
-            // Update inverter data
-            document.getElementById('inverter-power').textContent = `${data.inverter?.power || 0} kW`;
-            document.getElementById('inverter-efficiency').textContent = `${data.inverter?.efficiency || 0}%`;
-
-            // Update EV data
-            document.getElementById('ev-battery').textContent = `${data.ev?.battery || 0}%`;
-            document.getElementById('ev-range').textContent = `${data.ev?.range || 0} km`;
-
-            // Update graphs
-            updateGraphs();
-        }
-
-        function updateWeatherForecast(data) {
-            if (!data || !data.list) {
-                document.getElementById('weather-forecast').innerHTML = '<div class="col-12 text-center"><p>Failed to load weather data</p></div>';
-                return;
-            }
-
-            // Get the next 5 forecasts (every 3 hours)
-            const forecasts = data.list.slice(0, 5);
-            let forecastHTML = '';
-
-            forecasts.forEach(forecast => {
-                const date = new Date(forecast.dt * 1000);
-                const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const day = date.toLocaleDateString([], { weekday: 'short' });
-                const temp = Math.round(forecast.main.temp);
-                const clouds = forecast.clouds.all;
-                const weather = forecast.weather[0].main.toLowerCase();
-                
-                // Determine weather icon
-                let iconClass = 'bi-cloud';
-                if (weather.includes('clear')) {
-                    iconClass = 'bi-sun';
-                } else if (weather.includes('rain')) {
-                    iconClass = 'bi-cloud-rain';
-                } else if (weather.includes('snow')) {
-                    iconClass = 'bi-cloud-snow';
-                } else if (weather.includes('thunder')) {
-                    iconClass = 'bi-cloud-lightning';
-                }
-
-                forecastHTML += `
-                    <div class="col">
-                        <div class="forecast-card">
-                            <div class="forecast-time">${day} ${time}</div>
-                            <div class="weather-icon"><i class="bi ${iconClass}"></i></div>
-                            <div class="forecast-temp">${temp}°C</div>
-                            <div class="forecast-clouds">Clouds: ${clouds}%</div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            document.getElementById('weather-forecast').innerHTML = forecastHTML;
-        }
-
-        function updateSolarPrediction(predictions) {
-            if (!predictions || predictions.length === 0) {
-                return;
-            }
-
-            const trace = {
-                x: predictions.map(p => new Date(p.timestamp)),
-                y: predictions.map(p => p.power),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Predicted Power (kW)',
-                line: {
-                    color: 'rgba(255, 165, 0, 0.7)',
-                    dash: 'dash'
-                }
-            };
-
-            Plotly.newPlot('solar-prediction-graph', [trace], {
-                title: 'Solar Power Prediction (Next 5 Days)',
-                yaxis: { title: 'Power (kW)' }
-            });
-        }
-
-        async function updateGraphs() {
-            // Solar Power Graph
-            const solarData = await fetchHistoricalData('solar');
-            const solarTrace = {
-                x: solarData.map(d => new Date(d.timestamp)),
-                y: solarData.map(d => d.power),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Power (kW)'
-            };
-            Plotly.newPlot('solar-graph', [solarTrace], {
-                title: 'Solar Power Generation',
-                yaxis: { title: 'Power (kW)' }
-            });
-
-            // Battery Level Graph
-            const batteryData = await fetchHistoricalData('battery');
-            const batteryTrace = {
-                x: batteryData.map(d => new Date(d.timestamp)),
-                y: batteryData.map(d => d.charge_level),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Charge Level (%)'
-            };
-            Plotly.newPlot('battery-graph', [batteryTrace], {
-                title: 'Battery Charge Level',
-                yaxis: { title: 'Charge Level (%)' }
-            });
-
-            // Inverter Efficiency Graph
-            const inverterData = await fetchHistoricalData('inverter');
-            const inverterTrace = {
-                x: inverterData.map(d => new Date(d.timestamp)),
-                y: inverterData.map(d => d.efficiency),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Efficiency (%)'
-            };
-            Plotly.newPlot('inverter-graph', [inverterTrace], {
-                title: 'Inverter Efficiency',
-                yaxis: { title: 'Efficiency (%)' }
-            });
-
-            // EV Battery Level Graph
-            const evData = await fetchHistoricalData('ev');
-            const evTrace = {
-                x: evData.map(d => new Date(d.timestamp)),
-                y: evData.map(d => d.battery_level),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Battery Level (%)'
-            };
-            Plotly.newPlot('ev-graph', [evTrace], {
-                title: 'EV Battery Level',
-                yaxis: { title: 'Battery Level (%)' }
-            });
-
-            // Fetch solar prediction
-            await fetchSolarPrediction();
-        }
-
-        function updateTimeRange(hours) {
-            currentTimeRange = hours;
-            updateGraphs();
-        }
-
-        function updateLocation() {
-            const locationInput = document.getElementById('location-input');
-            currentLocation = locationInput.value.trim();
-            if (currentLocation) {
-                fetchWeatherData();
-                fetchSolarPrediction();
-            }
-        }
-
-        async function controlDevice(command) {
-            try {
-                const response = await fetch('/api/control', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ command })
-                });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    fetchStatus(); // Refresh the dashboard
-                }
-            } catch (error) {
-                console.error('Error controlling device:', error);
-            }
-        }
-
-        async function exportData() {
-            try {
-                const response = await fetch(`/api/export?hours=${currentTimeRange}`);
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `solax_data_export_${new Date().toISOString().slice(0,19).replace(/[:]/g, '')}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
-                } else {
-                    console.error('Export failed');
-                }
-            } catch (error) {
-                console.error('Error exporting data:', error);
-            }
-        }
-
-        // Initial fetch
-        fetchStatus();
-        fetchWeatherData();
+        
+        // Event listeners
+        document.getElementById('timeRange').addEventListener('change', updateHistoricalGraphs);
+        document.getElementById('exportButton').addEventListener('click', exportData);
+        
+        // Initial update
+        updateDashboard();
+        updateHistoricalGraphs();
+        updateWeatherAndPrediction();
+        
         // Update every 30 seconds
-        setInterval(fetchStatus, 30000);
-        // Update weather every 30 minutes
-        setInterval(fetchWeatherData, 1800000);
+        setInterval(updateDashboard, 30000);
+        setInterval(updateWeatherAndPrediction, 300000); // Every 5 minutes
     </script>
 </body>
 </html> 
