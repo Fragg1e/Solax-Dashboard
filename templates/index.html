@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Energy Dashboard</title>
+    <title>Solax Energy Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         .card {
             transition: transform 0.2s;
@@ -31,18 +32,42 @@
             font-size: 1.5rem;
             font-weight: bold;
         }
+        .graph-container {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .time-selector {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="#">
-                <i class="bi bi-lightning-charge-fill"></i> Energy Dashboard
+                <i class="bi bi-lightning-charge-fill"></i> Solax Energy Dashboard
             </a>
         </div>
     </nav>
 
     <div class="container mt-4">
+        <!-- Time Range Selector -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Time Range</h5>
+                        <div class="btn-group time-selector" role="group">
+                            <button class="btn btn-outline-primary" onclick="updateTimeRange(1)">1 Hour</button>
+                            <button class="btn btn-outline-primary" onclick="updateTimeRange(6)">6 Hours</button>
+                            <button class="btn btn-outline-primary" onclick="updateTimeRange(24)">24 Hours</button>
+                            <button class="btn btn-outline-primary" onclick="updateTimeRange(168)">7 Days</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row">
             <!-- Solar Panels Section -->
             <div class="col-md-6 col-lg-3">
@@ -58,6 +83,12 @@
                             <div class="progress-bar bg-warning" role="progressbar" style="width: 75%"></div>
                         </div>
                         <small class="text-muted">Daily Production: <span id="solar-daily">0 kWh</span></small>
+                    </div>
+                </div>
+                <div class="card shadow mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Power Generation History</h6>
+                        <div id="solar-graph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
@@ -78,6 +109,12 @@
                         <small class="text-muted">Capacity: <span id="battery-capacity">0 kWh</span></small>
                     </div>
                 </div>
+                <div class="card shadow mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Charge Level History</h6>
+                        <div id="battery-graph" class="graph-container"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Inverter Section -->
@@ -96,6 +133,12 @@
                         <small class="text-muted">Efficiency: <span id="inverter-efficiency">0%</span></small>
                     </div>
                 </div>
+                <div class="card shadow mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Efficiency History</h6>
+                        <div id="inverter-graph" class="graph-container"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Electric Vehicle Section -->
@@ -112,6 +155,12 @@
                             <div class="progress-bar bg-primary" role="progressbar" style="width: 30%"></div>
                         </div>
                         <small class="text-muted">Range: <span id="ev-range">0 km</span></small>
+                    </div>
+                </div>
+                <div class="card shadow mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Battery Level History</h6>
+                        <div id="ev-graph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
@@ -142,6 +191,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let currentTimeRange = 24; // Default to 24 hours
+
         async function fetchStatus() {
             try {
                 const response = await fetch('/api/status');
@@ -149,6 +200,17 @@
                 updateDashboard(data);
             } catch (error) {
                 console.error('Error fetching status:', error);
+            }
+        }
+
+        async function fetchHistoricalData(component) {
+            try {
+                const response = await fetch(`/api/historical/${component}?hours=${currentTimeRange}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error(`Error fetching ${component} historical data:`, error);
+                return [];
             }
         }
 
@@ -168,6 +230,72 @@
             // Update EV data
             document.getElementById('ev-battery').textContent = `${data.ev?.battery || 0}%`;
             document.getElementById('ev-range').textContent = `${data.ev?.range || 0} km`;
+
+            // Update graphs
+            updateGraphs();
+        }
+
+        async function updateGraphs() {
+            // Solar Power Graph
+            const solarData = await fetchHistoricalData('solar');
+            const solarTrace = {
+                x: solarData.map(d => new Date(d.timestamp)),
+                y: solarData.map(d => d.power),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Power (kW)'
+            };
+            Plotly.newPlot('solar-graph', [solarTrace], {
+                title: 'Solar Power Generation',
+                yaxis: { title: 'Power (kW)' }
+            });
+
+            // Battery Level Graph
+            const batteryData = await fetchHistoricalData('battery');
+            const batteryTrace = {
+                x: batteryData.map(d => new Date(d.timestamp)),
+                y: batteryData.map(d => d.charge_level),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Charge Level (%)'
+            };
+            Plotly.newPlot('battery-graph', [batteryTrace], {
+                title: 'Battery Charge Level',
+                yaxis: { title: 'Charge Level (%)' }
+            });
+
+            // Inverter Efficiency Graph
+            const inverterData = await fetchHistoricalData('inverter');
+            const inverterTrace = {
+                x: inverterData.map(d => new Date(d.timestamp)),
+                y: inverterData.map(d => d.efficiency),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Efficiency (%)'
+            };
+            Plotly.newPlot('inverter-graph', [inverterTrace], {
+                title: 'Inverter Efficiency',
+                yaxis: { title: 'Efficiency (%)' }
+            });
+
+            // EV Battery Level Graph
+            const evData = await fetchHistoricalData('ev');
+            const evTrace = {
+                x: evData.map(d => new Date(d.timestamp)),
+                y: evData.map(d => d.battery_level),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Battery Level (%)'
+            };
+            Plotly.newPlot('ev-graph', [evTrace], {
+                title: 'EV Battery Level',
+                yaxis: { title: 'Battery Level (%)' }
+            });
+        }
+
+        function updateTimeRange(hours) {
+            currentTimeRange = hours;
+            updateGraphs();
         }
 
         async function controlDevice(command) {
