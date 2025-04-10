@@ -45,10 +45,24 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# Initialize Solax client
+# Initialize Solax client - choose ONE of these options based on your SolaxClient implementation:
+
+# Option 1: If your SolaxClient only needs token_id
+solax_client = SolaxClient(
+    token_id=os.getenv('SOLAX_TOKEN_ID')
+)
+
+# Option 2: If it needs token_id and serial number (but parameter is named differently)
 solax_client = SolaxClient(
     token_id=os.getenv('SOLAX_TOKEN_ID'),
-    wifi_sn=os.getenv('SOLAX_WIFI_SN')
+    # Use ONLY the parameters that exist in your solax_client.py
+    # Remove any that aren't in the actual class definition
+)
+
+# Option 3: If it needs token_id and base_url
+solax_client = SolaxClient(
+    token_id=os.getenv('SOLAX_TOKEN_ID'),
+    base_url="https://www.solaxcloud.com/api/v2"  # or whatever URL your API uses
 )
 
 # Weather API configuration
@@ -174,78 +188,12 @@ def get_real_data():
     """Get real data from the Solax system."""
     try:
         # Get real-time data from Solax
-        response = solax_client.get_realtime_data()
+        data = solax_client.get_realtime_data(os.getenv('SOLAX_WIFI_SN'))
+        if data.get('success'):
+            return jsonify(data['result'])
         
-        if not response["success"]:
-            logger.error(f"Failed to get real-time data: {response['exception']}")
-            return get_mock_data()
-        
-        data = response["result"]
-        
-        # Process the real data
-        processed_data = {
-            "solar": {
-                "power": data.get("acpower", 0) / 1000,  # Convert W to kW
-                "daily": data.get("yieldtoday", 0),
-                "status": "active" if data.get("inverterStatus") == "102" else "inactive"
-            },
-            "battery": {
-                "level": data.get("soc", 0),
-                "capacity": 10,  # Default capacity in kWh
-                "status": "active" if data.get("batStatus") == "0" else "inactive"
-            },
-            "inverter": {
-                "power": data.get("acpower", 0) / 1000,  # Convert W to kW
-                "efficiency": 95,  # Default efficiency
-                "status": "active" if data.get("inverterStatus") == "102" else "inactive"
-            },
-            "ev": {
-                "battery": 0,  # Not available in API
-                "range": 0,  # Not available in API
-                "status": "inactive"
-            }
-        }
-        
-        # Log the data
-        logger.info(f"Retrieved real data: {processed_data}")
-        
-        # Store the data in the database
-        with app.app_context():
-            # Store solar data
-            solar_data = SolarData(
-                power=processed_data['solar']['power'],
-                daily_production=processed_data['solar']['daily'],
-                efficiency=processed_data['inverter']['efficiency']
-            )
-            db.session.add(solar_data)
-            
-            # Store battery data
-            battery_data_model = BatteryData(
-                charge_level=processed_data['battery']['level'],
-                power_flow=0,  # Power flow not available in API
-                temperature=0  # Temperature not available in API
-            )
-            db.session.add(battery_data_model)
-            
-            # Store inverter data
-            inverter_data_model = InverterData(
-                power_output=processed_data['inverter']['power'],
-                efficiency=processed_data['inverter']['efficiency'],
-                temperature=0  # Temperature not available in API
-            )
-            db.session.add(inverter_data_model)
-            
-            # Store EV data (mock data since Solax doesn't provide this)
-            ev_data = EVData(
-                battery_level=processed_data['ev']['battery'],
-                charging_power=0,
-                estimated_range=processed_data['ev']['range']
-            )
-            db.session.add(ev_data)
-            
-            db.session.commit()
-        
-        return processed_data
+        logger.error(f"Failed to get real-time data: {data['exception']}")
+        return get_mock_data()
     except Exception as e:
         logger.error(f"Error getting real data: {str(e)}")
         return get_mock_data()

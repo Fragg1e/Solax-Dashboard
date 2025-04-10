@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 class SolaxClient:
     """Client for interacting with Solax API v2.0."""
     
-    def __init__(self, token_id=None, base_url="https://www.solaxcloud.com/api/v2"):
+    def __init__(self, token_id=None, base_url="https://www.solaxcloud.com/proxyApp/proxy/api"):
         """Initialize the Solax client.
         
         Args:
             token_id (str, optional): Solax API token ID. Defaults to None.
-            base_url (str, optional): Base URL for the Solax API. Defaults to "https://www.solaxcloud.com/api/v2".
+            base_url (str, optional): Base URL for the Solax API. Defaults to "https://www.solaxcloud.com/proxyApp/proxy/api".
         """
         self.token_id = token_id or os.environ.get('SOLAX_TOKEN_ID')
         if not self.token_id:
@@ -74,13 +74,14 @@ class SolaxClient:
                 - batStatus: Battery status (0=normal, 1=fault, 2=disconnected)
         """
         try:
-            data = {
-                "tokenId": self.token_id,
-                "sn": wifi_sn
+            params = {
+                'tokenId': self.token_id,
+                'sn': wifi_sn
             }
-            response = self.session.post(
-                f"{self.base_url}/inverter/getRealtimeInfo.do",
-                json=data
+            response = self.session.get(
+                f"{self.base_url}/getRealtimeInfo.do",
+                params=params,
+                timeout=10
             )
             response.raise_for_status()
             return response.json()
