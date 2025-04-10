@@ -39,6 +39,24 @@
         .time-selector {
             margin-bottom: 20px;
         }
+        .weather-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .forecast-card {
+            text-align: center;
+            padding: 10px;
+        }
+        .forecast-time {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .forecast-temp {
+            font-size: 1.2rem;
+        }
+        .location-input {
+            max-width: 300px;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -51,6 +69,42 @@
     </nav>
 
     <div class="container mt-4">
+        <!-- Location Selector -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">Location</h5>
+                        <div class="input-group location-input">
+                            <input type="text" class="form-control" id="location-input" placeholder="Enter city, country" value="London,UK">
+                            <button class="btn btn-primary" onclick="updateLocation()">
+                                <i class="bi bi-search"></i> Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Forecast -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-cloud-sun"></i> Weather Forecast
+                        </h5>
+                        <div class="row" id="weather-forecast">
+                            <!-- Weather forecast cards will be inserted here -->
+                            <div class="col-12 text-center">
+                                <p>Loading weather data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Time Range Selector -->
         <div class="row mb-4">
             <div class="col-12">
@@ -89,6 +143,12 @@
                     <div class="card-body">
                         <h6 class="card-title">Power Generation History</h6>
                         <div id="solar-graph" class="graph-container"></div>
+                    </div>
+                </div>
+                <div class="card shadow mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Solar Power Prediction</h6>
+                        <div id="solar-prediction-graph" class="graph-container"></div>
                     </div>
                 </div>
             </div>
@@ -182,6 +242,9 @@
                             <button class="btn btn-info" onclick="controlDevice('optimize_power')">
                                 <i class="bi bi-gear"></i> Optimize Power
                             </button>
+                            <button class="btn btn-success" onclick="exportData()">
+                                <i class="bi bi-download"></i> Export Data
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -192,6 +255,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentTimeRange = 24; // Default to 24 hours
+        let currentLocation = "London,UK"; // Default location
 
         async function fetchStatus() {
             try {
@@ -210,6 +274,30 @@
                 return data;
             } catch (error) {
                 console.error(`Error fetching ${component} historical data:`, error);
+                return [];
+            }
+        }
+
+        async function fetchWeatherData() {
+            try {
+                const response = await fetch(`/api/weather?location=${encodeURIComponent(currentLocation)}`);
+                const data = await response.json();
+                updateWeatherForecast(data);
+                return data;
+            } catch (error) {
+                console.error('Error fetching weather data:', error);
+                return null;
+            }
+        }
+
+        async function fetchSolarPrediction() {
+            try {
+                const response = await fetch(`/api/solar-prediction?location=${encodeURIComponent(currentLocation)}`);
+                const data = await response.json();
+                updateSolarPrediction(data);
+                return data;
+            } catch (error) {
+                console.error('Error fetching solar prediction:', error);
                 return [];
             }
         }
@@ -233,6 +321,74 @@
 
             // Update graphs
             updateGraphs();
+        }
+
+        function updateWeatherForecast(data) {
+            if (!data || !data.list) {
+                document.getElementById('weather-forecast').innerHTML = '<div class="col-12 text-center"><p>Failed to load weather data</p></div>';
+                return;
+            }
+
+            // Get the next 5 forecasts (every 3 hours)
+            const forecasts = data.list.slice(0, 5);
+            let forecastHTML = '';
+
+            forecasts.forEach(forecast => {
+                const date = new Date(forecast.dt * 1000);
+                const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const day = date.toLocaleDateString([], { weekday: 'short' });
+                const temp = Math.round(forecast.main.temp);
+                const clouds = forecast.clouds.all;
+                const weather = forecast.weather[0].main.toLowerCase();
+                
+                // Determine weather icon
+                let iconClass = 'bi-cloud';
+                if (weather.includes('clear')) {
+                    iconClass = 'bi-sun';
+                } else if (weather.includes('rain')) {
+                    iconClass = 'bi-cloud-rain';
+                } else if (weather.includes('snow')) {
+                    iconClass = 'bi-cloud-snow';
+                } else if (weather.includes('thunder')) {
+                    iconClass = 'bi-cloud-lightning';
+                }
+
+                forecastHTML += `
+                    <div class="col">
+                        <div class="forecast-card">
+                            <div class="forecast-time">${day} ${time}</div>
+                            <div class="weather-icon"><i class="bi ${iconClass}"></i></div>
+                            <div class="forecast-temp">${temp}°C</div>
+                            <div class="forecast-clouds">Clouds: ${clouds}%</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('weather-forecast').innerHTML = forecastHTML;
+        }
+
+        function updateSolarPrediction(predictions) {
+            if (!predictions || predictions.length === 0) {
+                return;
+            }
+
+            const trace = {
+                x: predictions.map(p => new Date(p.timestamp)),
+                y: predictions.map(p => p.power),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Predicted Power (kW)',
+                line: {
+                    color: 'rgba(255, 165, 0, 0.7)',
+                    dash: 'dash'
+                }
+            };
+
+            Plotly.newPlot('solar-prediction-graph', [trace], {
+                title: 'Solar Power Prediction (Next 5 Days)',
+                yaxis: { title: 'Power (kW)' }
+            });
         }
 
         async function updateGraphs() {
@@ -291,11 +447,23 @@
                 title: 'EV Battery Level',
                 yaxis: { title: 'Battery Level (%)' }
             });
+
+            // Fetch solar prediction
+            await fetchSolarPrediction();
         }
 
         function updateTimeRange(hours) {
             currentTimeRange = hours;
             updateGraphs();
+        }
+
+        function updateLocation() {
+            const locationInput = document.getElementById('location-input');
+            currentLocation = locationInput.value.trim();
+            if (currentLocation) {
+                fetchWeatherData();
+                fetchSolarPrediction();
+            }
         }
 
         async function controlDevice(command) {
@@ -316,10 +484,34 @@
             }
         }
 
+        async function exportData() {
+            try {
+                const response = await fetch(`/api/export?hours=${currentTimeRange}`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `solax_data_export_${new Date().toISOString().slice(0,19).replace(/[:]/g, '')}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    console.error('Export failed');
+                }
+            } catch (error) {
+                console.error('Error exporting data:', error);
+            }
+        }
+
         // Initial fetch
         fetchStatus();
+        fetchWeatherData();
         // Update every 30 seconds
         setInterval(fetchStatus, 30000);
+        // Update weather every 30 minutes
+        setInterval(fetchWeatherData, 1800000);
     </script>
 </body>
 </html> 

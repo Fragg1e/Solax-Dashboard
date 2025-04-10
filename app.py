@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_file
 import random
 from datetime import datetime, timedelta
 import os
@@ -7,6 +7,10 @@ import logging
 from logging.handlers import RotatingFileHandler
 import pandas as pd
 from models import db, SolarData, BatteryData, InverterData, EVData
+import csv
+import io
+import requests
+import json
 
 # Load environment variables
 load_dotenv()
@@ -37,6 +41,62 @@ db.init_app(app)
 # Create database tables
 with app.app_context():
     db.create_all()
+
+# Weather API configuration
+WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', 'your_api_key_here')
+WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/forecast"
+DEFAULT_LOCATION = "London,UK"  # Default location if none is provided
+
+def get_weather_data(location=DEFAULT_LOCATION):
+    """Fetch weather forecast data from OpenWeatherMap API."""
+    try:
+        params = {
+            'q': location,
+            'appid': WEATHER_API_KEY,
+            'units': 'metric'  # Use metric units
+        }
+        response = requests.get(WEATHER_API_URL, params=params)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Error fetching weather data: {str(e)}")
+        return None
+
+def predict_solar_power(weather_data):
+    """Predict solar power generation based on weather forecast."""
+    if not weather_data or 'list' not in weather_data:
+        return []
+    
+    predictions = []
+    
+    # Base solar capacity (in kW) - adjust based on your system
+    base_capacity = 5.0
+    
+    for item in weather_data['list']:
+        timestamp = datetime.fromtimestamp(item['dt'])
+        
+        # Get cloud coverage percentage
+        clouds = item.get('clouds', {}).get('all', 50)
+        
+        # Calculate solar power based on cloud coverage
+        # Simple model: power = base_capacity * (1 - cloud_coverage/100)
+        # This is a simplified model - real solar prediction would use more factors
+        power = base_capacity * (1 - clouds/100)
+        
+        # Adjust for time of day (no power at night)
+        hour = timestamp.hour
+        if hour < 6 or hour > 18:  # Assume no solar power outside these hours
+            power = 0
+        
+        predictions.append({
+            'timestamp': timestamp.isoformat(),
+            'power': round(power, 2),
+            'clouds': clouds,
+            'temperature': item.get('main', {}).get('temp', 0),
+            'weather': item.get('weather', [{}])[0].get('description', '')
+        })
+    
+    return predictions
 
 def get_mock_data():
     """Generate mock data for the dashboard."""
@@ -185,6 +245,80 @@ def control_device():
     }
     
     return jsonify(response)
+
+@app.route('/api/export', methods=['GET'])
+def export_data():
+    try:
+        # Get time range from query parameters (default to 7 days)
+        hours = int(request.args.get('hours', 168))
+        start_time = datetime.utcnow() - timedelta(hours=hours)
+        
+        # Query all data within the time range
+        solar_data = SolarData.query.filter(SolarData.timestamp >= start_time).all()
+        battery_data = BatteryData.query.filter(BatteryData.timestamp >= start_time).all()
+        inverter_data = InverterData.query.filter(InverterData.timestamp >= start_time).all()
+        ev_data = EVData.query.filter(EVData.timestamp >= start_time).all()
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        writer.writerow(['Timestamp', 'Component', 'Metric', 'Value', 'Unit'])
+        
+        # Write solar data
+        for data in solar_data:
+            writer.writerow([data.timestamp, 'Solar', 'Power', data.power, 'kW'])
+            writer.writerow([data.timestamp, 'Solar', 'Daily Production', data.daily_production, 'kWh'])
+        
+        # Write battery data
+        for data in battery_data:
+            writer.writerow([data.timestamp, 'Battery', 'Charge Level', data.charge_level, '%'])
+            writer.writerow([data.timestamp, 'Battery', 'Capacity', data.capacity, 'kWh'])
+        
+        # Write inverter data
+        for data in inverter_data:
+            writer.writerow([data.timestamp, 'Inverter', 'Power', data.power_output, 'kW'])
+            writer.writerow([data.timestamp, 'Inverter', 'Efficiency', data.efficiency, '%'])
+        
+        # Write EV data
+        for data in ev_data:
+            writer.writerow([data.timestamp, 'EV', 'Battery Level', data.battery_level, '%'])
+            writer.writerow([data.timestamp, 'EV', 'Range', data.estimated_range, 'km'])
+        
+        # Prepare the response
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'solax_data_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/weather', methods=['GET'])
+def get_weather():
+    """Returns weather forecast data."""
+    location = request.args.get('location', DEFAULT_LOCATION)
+    weather_data = get_weather_data(location)
+    
+    if not weather_data:
+        return jsonify({'error': 'Failed to fetch weather data'}), 500
+    
+    return jsonify(weather_data)
+
+@app.route('/api/solar-prediction', methods=['GET'])
+def get_solar_prediction():
+    """Returns solar power prediction based on weather forecast."""
+    location = request.args.get('location', DEFAULT_LOCATION)
+    weather_data = get_weather_data(location)
+    
+    if not weather_data:
+        return jsonify({'error': 'Failed to fetch weather data'}), 500
+    
+    predictions = predict_solar_power(weather_data)
+    return jsonify(predictions)
 
 if __name__ == '__main__':
     # Get port from environment variable or default to 5000
