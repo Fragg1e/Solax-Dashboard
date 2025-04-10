@@ -14,18 +14,14 @@ logger = logging.getLogger(__name__)
 class SolaxClient:
     """Client for interacting with Solax API v2.0."""
     
-    def __init__(self, token_id=None, base_url="https://www.solaxcloud.com/proxyApp/proxy/api"):
+    def __init__(self, token_id):
         """Initialize the Solax client.
         
         Args:
-            token_id (str, optional): Solax API token ID. Defaults to None.
-            base_url (str, optional): Base URL for the Solax API. Defaults to "https://www.solaxcloud.com/proxyApp/proxy/api".
+            token_id (str): Solax API token ID.
         """
-        self.token_id = token_id or os.environ.get('SOLAX_TOKEN_ID')
-        if not self.token_id:
-            raise ValueError("Token ID is required. Set SOLAX_TOKEN_ID environment variable or pass token_id parameter.")
-            
-        self.base_url = base_url.rstrip('/')
+        self.token_id = token_id
+        self.base_url = "https://www.solaxcloud.com/proxyApp/proxy/api"
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
@@ -290,7 +286,7 @@ class SolaxClient:
 
 # For testing
 if __name__ == "__main__":
-    client = SolaxClient()
+    client = SolaxClient(os.getenv('SOLAX_TOKEN_ID'))
     wifi_sn = os.getenv('SOLAX_WIFI_SN')
     if wifi_sn:
         result = client.get_realtime_data(wifi_sn)

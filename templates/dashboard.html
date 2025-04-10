@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Solax Live Dashboard</title>
+    <style>
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px;
+            width: 200px;
+            display: inline-block;
+            text-align: center;
+        }
+        .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .label {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Live Solar Stats</h1>
+    
+    <div class="card">
+        <div class="value">{{ ac_power }}W</div>
+        <div class="label">AC Power</div>
+    </div>
+    
+    <div class="card">
+        <div class="value">{{ yield_today }}kWh</div>
+        <div class="label">Today's Yield</div>
+    </div>
+    
+    <div class="card">
+        <div class="value">{{ battery_soc }}%</div>
+        <div class="label">Battery SOC</div>
+    </div>
+    
+    <div class="card">
+        <div class="value">{{ feed_in_power }}W</div>
+        <div class="label">Feed-in Power</div>
+    </div>
+</body>
+</html> 
