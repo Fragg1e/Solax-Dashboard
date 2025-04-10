@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: solax-dashboard
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SOLAX_API_KEY
+        sync: false
+      - key: BATTERY_API_KEY
+        sync: false
+      - key: INVERTER_API_KEY
+        sync: false
+      - key: EV_API_KEY
+        sync: false 
