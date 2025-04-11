@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, flash, redirect, url_for
 import os
 from solax_client import SolaxClient
 from dotenv import load_dotenv
@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 
 # Initialize Solax client
 solax_client = SolaxClient(token_id=os.getenv('SOLAX_TOKEN_ID'))
@@ -15,11 +16,13 @@ def dashboard():
     try:
         wifi_sn = os.getenv('SOLAX_WIFI_SN')
         if not wifi_sn:
-            return render_template('error.html', message="SOLAX_WIFI_SN not configured")
+            flash("SOLAX_WIFI_SN not configured", "error")
+            return render_template('index.html')
             
         data = solax_client.get_realtime_data(wifi_sn)
         if not data.get('success'):
-            return render_template('error.html', message=data.get('exception', 'API Error'))
+            flash(data.get('exception', 'API Error'), "error")
+            return render_template('index.html')
             
         return render_template('index.html', 
             ac_power=data['result']['acpower'],
@@ -29,7 +32,8 @@ def dashboard():
         )
         
     except Exception as e:
-        return render_template('error.html', message=str(e))
+        flash(str(e), "error")
+        return render_template('index.html')
 
 @app.route('/api/status')
 def get_status():

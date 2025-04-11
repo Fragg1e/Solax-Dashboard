@@ -19,28 +19,43 @@
         .label {
             color: #666;
         }
+        .flash-message {
+            padding: 10px;
+            margin: 10px;
+            border-radius: 4px;
+            background-color: #ffebee;
+            color: #c62828;
+        }
     </style>
 </head>
 <body>
     <h1>Live Solar Stats</h1>
     
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
     <div class="card">
-        <div class="value">{{ ac_power }}W</div>
+        <div class="value">{{ ac_power|default('--') }}W</div>
         <div class="label">AC Power</div>
     </div>
     
     <div class="card">
-        <div class="value">{{ yield_today }}kWh</div>
+        <div class="value">{{ yield_today|default('--') }}kWh</div>
         <div class="label">Today's Yield</div>
     </div>
     
     <div class="card">
-        <div class="value">{{ battery_soc }}%</div>
+        <div class="value">{{ battery_soc|default('--') }}%</div>
         <div class="label">Battery SOC</div>
     </div>
     
     <div class="card">
-        <div class="value">{{ feed_in_power }}W</div>
+        <div class="value">{{ feed_in_power|default('--') }}W</div>
         <div class="label">Feed-in Power</div>
     </div>
 </body>
