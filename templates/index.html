@@ -1,411 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solax Energy Dashboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.24.1/plotly.min.js"></script>
+    <title>Solax Live Dashboard</title>
     <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .dashboard-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
         .card {
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-            transition: transform 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-        }
-        .card-header {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
-            border-radius: 15px 15px 0 0 !important;
-            padding: 15px 20px;
-        }
-        .card-body {
+            border: 1px solid #ddd;
+            border-radius: 8px;
             padding: 20px;
-        }
-        .status-indicator {
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
+            margin: 10px;
+            width: 200px;
             display: inline-block;
-            margin-right: 5px;
+            text-align: center;
         }
-        .status-active {
-            background-color: #28a745;
-        }
-        .status-inactive {
-            background-color: #dc3545;
-        }
-        .metric-value {
+        .value {
             font-size: 24px;
             font-weight: bold;
-            color: #212529;
         }
-        .metric-label {
-            font-size: 14px;
-            color: #6c757d;
-        }
-        .graph-container {
-            height: 300px;
-            margin-top: 20px;
-        }
-        .time-range-selector {
-            margin-bottom: 20px;
-        }
-        .export-button {
-            margin-bottom: 20px;
+        .label {
+            color: #666;
         }
     </style>
 </head>
 <body>
-    <div class="dashboard-container">
-        <h1 class="mb-4">Solax Energy Dashboard</h1>
-        
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="time-range-selector">
-                    <label for="timeRange" class="form-label">Time Range:</label>
-                    <select id="timeRange" class="form-select">
-                        <option value="1">Last Hour</option>
-                        <option value="6">Last 6 Hours</option>
-                        <option value="24" selected>Last 24 Hours</option>
-                        <option value="168">Last 7 Days</option>
-                        <option value="720">Last 30 Days</option>
-                    </select>
-                </div>
-            </div>
-            <div class="col-md-6 text-end">
-                <button id="exportButton" class="btn btn-primary export-button">
-                    <i class="bi bi-download"></i> Export Data
-                </button>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6 col-lg-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <span id="solarStatus" class="status-indicator status-inactive"></span>
-                            Solar Panels
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <div class="metric-value" id="solarPower">0 kW</div>
-                            <div class="metric-label">Current Power</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="metric-value" id="solarDaily">0 kWh</div>
-                            <div class="metric-label">Daily Production</div>
-                        </div>
-                        <div id="solarGraph" class="graph-container"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6 col-lg-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <span id="batteryStatus" class="status-indicator status-inactive"></span>
-                            Battery
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <div class="metric-value" id="batteryLevel">0%</div>
-                            <div class="metric-label">Charge Level</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="metric-value" id="batteryCapacity">0 kWh</div>
-                            <div class="metric-label">Capacity</div>
-                        </div>
-                        <div id="batteryGraph" class="graph-container"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6 col-lg-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <span id="inverterStatus" class="status-indicator status-inactive"></span>
-                            Inverter
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <div class="metric-value" id="inverterPower">0 kW</div>
-                            <div class="metric-label">Power Output</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="metric-value" id="inverterEfficiency">0%</div>
-                            <div class="metric-label">Efficiency</div>
-                        </div>
-                        <div id="inverterGraph" class="graph-container"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6 col-lg-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <span id="evStatus" class="status-indicator status-inactive"></span>
-                            Electric Vehicle
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <div class="metric-value" id="evBattery">0%</div>
-                            <div class="metric-label">Battery Level</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="metric-value" id="evRange">0 km</div>
-                            <div class="metric-label">Estimated Range</div>
-                        </div>
-                        <div id="evGraph" class="graph-container"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Weather Forecast</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="weatherGraph" class="graph-container"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Solar Power Prediction</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="solarPredictionGraph" class="graph-container"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <h1>Live Solar Stats</h1>
+    
+    <div class="card">
+        <div class="value">{{ ac_power }}W</div>
+        <div class="label">AC Power</div>
     </div>
     
-    <script>
-        // Function to update the dashboard with real-time data
-        function updateDashboard() {
-            fetch('/api/status')
-                .then(response => response.json())
-                .then(data => {
-                    // Update solar panel data
-                    document.getElementById('solarPower').textContent = `${data.solar.power} kW`;
-                    document.getElementById('solarDaily').textContent = `${data.solar.daily} kWh`;
-                    document.getElementById('solarStatus').className = `status-indicator status-${data.solar.status}`;
-                    
-                    // Update battery data
-                    document.getElementById('batteryLevel').textContent = `${data.battery.level}%`;
-                    document.getElementById('batteryCapacity').textContent = `${data.battery.capacity} kWh`;
-                    document.getElementById('batteryStatus').className = `status-indicator status-${data.battery.status}`;
-                    
-                    // Update inverter data
-                    document.getElementById('inverterPower').textContent = `${data.inverter.power} kW`;
-                    document.getElementById('inverterEfficiency').textContent = `${data.inverter.efficiency}%`;
-                    document.getElementById('inverterStatus').className = `status-indicator status-${data.inverter.status}`;
-                    
-                    // Update EV data
-                    document.getElementById('evBattery').textContent = `${data.ev.battery}%`;
-                    document.getElementById('evRange').textContent = `${data.ev.range} km`;
-                    document.getElementById('evStatus').className = `status-indicator status-${data.ev.status}`;
-                })
-                .catch(error => console.error('Error fetching status:', error));
-        }
-        
-        // Function to update historical data graphs
-        function updateHistoricalGraphs() {
-            const timeRange = document.getElementById('timeRange').value;
-            
-            // Update solar graph
-            fetch(`/api/historical/solar?hours=${timeRange}`)
-                .then(response => response.json())
-                .then(data => {
-                    const timestamps = data.map(d => new Date(d.timestamp));
-                    const power = data.map(d => d.power);
-                    
-                    Plotly.newPlot('solarGraph', [{
-                        x: timestamps,
-                        y: power,
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'Solar Power'
-                    }], {
-                        title: 'Solar Power Over Time',
-                        xaxis: { title: 'Time' },
-                        yaxis: { title: 'Power (kW)' }
-                    });
-                })
-                .catch(error => console.error('Error fetching solar data:', error));
-            
-            // Update battery graph
-            fetch(`/api/historical/battery?hours=${timeRange}`)
-                .then(response => response.json())
-                .then(data => {
-                    const timestamps = data.map(d => new Date(d.timestamp));
-                    const chargeLevel = data.map(d => d.charge_level);
-                    
-                    Plotly.newPlot('batteryGraph', [{
-                        x: timestamps,
-                        y: chargeLevel,
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'Battery Level'
-                    }], {
-                        title: 'Battery Level Over Time',
-                        xaxis: { title: 'Time' },
-                        yaxis: { title: 'Charge Level (%)' }
-                    });
-                })
-                .catch(error => console.error('Error fetching battery data:', error));
-            
-            // Update inverter graph
-            fetch(`/api/historical/inverter?hours=${timeRange}`)
-                .then(response => response.json())
-                .then(data => {
-                    const timestamps = data.map(d => new Date(d.timestamp));
-                    const powerOutput = data.map(d => d.power_output);
-                    
-                    Plotly.newPlot('inverterGraph', [{
-                        x: timestamps,
-                        y: powerOutput,
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'Inverter Power'
-                    }], {
-                        title: 'Inverter Power Over Time',
-                        xaxis: { title: 'Time' },
-                        yaxis: { title: 'Power (kW)' }
-                    });
-                })
-                .catch(error => console.error('Error fetching inverter data:', error));
-            
-            // Update EV graph
-            fetch(`/api/historical/ev?hours=${timeRange}`)
-                .then(response => response.json())
-                .then(data => {
-                    const timestamps = data.map(d => new Date(d.timestamp));
-                    const batteryLevel = data.map(d => d.battery_level);
-                    
-                    Plotly.newPlot('evGraph', [{
-                        x: timestamps,
-                        y: batteryLevel,
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'EV Battery Level'
-                    }], {
-                        title: 'EV Battery Level Over Time',
-                        xaxis: { title: 'Time' },
-                        yaxis: { title: 'Battery Level (%)' }
-                    });
-                })
-                .catch(error => console.error('Error fetching EV data:', error));
-        }
-        
-        // Function to update weather and solar prediction graphs
-        function updateWeatherAndPrediction() {
-            // Update weather graph
-            fetch('/api/weather')
-                .then(response => response.json())
-                .then(data => {
-                    const timestamps = data.list.map(d => new Date(d.dt * 1000));
-                    const temperatures = data.list.map(d => d.main.temp);
-                    const clouds = data.list.map(d => d.clouds.all);
-                    
-                    Plotly.newPlot('weatherGraph', [
-                        {
-                            x: timestamps,
-                            y: temperatures,
-                            type: 'scatter',
-                            mode: 'lines',
-                            name: 'Temperature'
-                        },
-                        {
-                            x: timestamps,
-                            y: clouds,
-                            type: 'scatter',
-                            mode: 'lines',
-                            name: 'Cloud Coverage',
-                            yaxis: 'y2'
-                        }
-                    ], {
-                        title: 'Weather Forecast',
-                        xaxis: { title: 'Time' },
-                        yaxis: { title: 'Temperature (°C)' },
-                        yaxis2: {
-                            title: 'Cloud Coverage (%)',
-                            overlaying: 'y',
-                            side: 'right'
-                        }
-                    });
-                })
-                .catch(error => console.error('Error fetching weather data:', error));
-            
-            // Update solar prediction graph
-            fetch('/api/solar-prediction')
-                .then(response => response.json())
-                .then(data => {
-                    const timestamps = data.map(d => new Date(d.timestamp));
-                    const power = data.map(d => d.power);
-                    
-                    Plotly.newPlot('solarPredictionGraph', [{
-                        x: timestamps,
-                        y: power,
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'Predicted Solar Power'
-                    }], {
-                        title: 'Solar Power Prediction',
-                        xaxis: { title: 'Time' },
-                        yaxis: { title: 'Power (kW)' }
-                    });
-                })
-                .catch(error => console.error('Error fetching solar prediction:', error));
-        }
-        
-        // Function to export data
-        function exportData() {
-            const timeRange = document.getElementById('timeRange').value;
-            window.location.href = `/api/export?hours=${timeRange}`;
-        }
-        
-        // Event listeners
-        document.getElementById('timeRange').addEventListener('change', updateHistoricalGraphs);
-        document.getElementById('exportButton').addEventListener('click', exportData);
-        
-        // Initial update
-        updateDashboard();
-        updateHistoricalGraphs();
-        updateWeatherAndPrediction();
-        
-        // Update every 30 seconds
-        setInterval(updateDashboard, 30000);
-        setInterval(updateWeatherAndPrediction, 300000); // Every 5 minutes
-    </script>
+    <div class="card">
+        <div class="value">{{ yield_today }}kWh</div>
+        <div class="label">Today's Yield</div>
+    </div>
+    
+    <div class="card">
+        <div class="value">{{ battery_soc }}%</div>
+        <div class="label">Battery SOC</div>
+    </div>
+    
+    <div class="card">
+        <div class="value">{{ feed_in_power }}W</div>
+        <div class="label">Feed-in Power</div>
+    </div>
 </body>
 </html> 
