@@ -136,6 +136,15 @@ async function updateSolaxData() {
 
       // Update grid status
       updateGridStatusIcon(solaxData.feedinpower);
+    } else if (data.exception && data.exception.includes("Query success")) {
+      // This is actually a success case with a misleading exception message
+      console.log("Solax API Success:", data.exception);
+      // We don't have data to display, so show N/A
+      safelyUpdateElement("acpower", "N/A");
+      safelyUpdateElement("yieldtoday", "N/A");
+      safelyUpdateElement("feedinpower", "N/A");
+      safelyUpdateElement("feedinenergy", "N/A");
+      safelyUpdateElement("consumeenergy", "N/A");
     } else {
       console.error("Solax API Error:", data.exception || "Unknown error");
       // Update UI to show error state
