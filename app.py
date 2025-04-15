@@ -186,8 +186,32 @@ def get_solax_data():
 
                 # Check if the response indicates an error
                 if isinstance(data, dict):
+                    # Special case: "Query success!" message with "no auth!" result
+                    if (
+                        data.get("exception") == "Query success!"
+                        and data.get("result") == "no auth!"
+                    ):
+                        logger.warning(
+                            "Solax API authentication issue: 'no auth!' result"
+                        )
+                        return {
+                            "success": True,
+                            "data": {
+                                "acpower": 0,
+                                "yieldtoday": 0,
+                                "feedinpower": 0,
+                                "feedinenergy": 0,
+                                "consumeenergy": 0,
+                                "batStatus": 0,
+                                "soc": 0,
+                                "batPower": 0,
+                            },
+                            "auth_issue": True,
+                        }
+
                     # Special case: "Query success!" message
                     if data.get("exception") == "Query success!":
+                        logger.info("Solax API returned 'Query success!' message")
                         return {
                             "success": True,
                             "data": {
