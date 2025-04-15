@@ -186,6 +186,22 @@ def get_solax_data():
 
                 # Check if the response indicates an error
                 if isinstance(data, dict):
+                    # Special case: "Query success!" message
+                    if data.get("exception") == "Query success!":
+                        return {
+                            "success": True,
+                            "data": {
+                                "acpower": 0,
+                                "yieldtoday": 0,
+                                "feedinpower": 0,
+                                "feedinenergy": 0,
+                                "consumeenergy": 0,
+                                "batStatus": 0,
+                                "soc": 0,
+                                "batPower": 0,
+                            },
+                        }
+
                     if data.get("success", False) is False:
                         error_msg = f"API returned error: {data.get('exception', 'Unknown error')}"
                         logger.error(error_msg)
@@ -452,31 +468,44 @@ def weather():
         current_response = requests.get(current_url)
         current_data = current_response.json()
 
+        # Check if the current weather response is valid
+        if current_response.status_code != 200 or "weather" not in current_data:
+            logger.error(f"Invalid current weather response: {current_data}")
+            return render_template(
+                "weather.html", error="Failed to fetch current weather data"
+            )
+
         # Get 5-day forecast
         forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?q={OPENWEATHER_CITY}&appid={OPENWEATHER_API_KEY}&units=metric"
         forecast_response = requests.get(forecast_url)
         forecast_data = forecast_response.json()
 
+        # Check if the forecast response is valid
+        if forecast_response.status_code != 200 or "list" not in forecast_data:
+            logger.error(f"Invalid forecast response: {forecast_data}")
+            return render_template(
+                "weather.html", error="Failed to fetch forecast data"
+            )
+
         # Process forecast data to group by day
         daily_forecasts = {}
-        if forecast_data.get("list"):
-            for item in forecast_data["list"]:
-                date = datetime.fromtimestamp(item["dt"]).strftime("%Y-%m-%d")
-                if date not in daily_forecasts:
-                    daily_forecasts[date] = {
-                        "temp_min": float("inf"),
-                        "temp_max": float("-inf"),
-                        "description": item["weather"][0]["description"],
-                        "icon": item["weather"][0]["icon"],
-                        "humidity": item["main"]["humidity"],
-                        "wind_speed": item["wind"]["speed"],
-                    }
-                daily_forecasts[date]["temp_min"] = min(
-                    daily_forecasts[date]["temp_min"], item["main"]["temp_min"]
-                )
-                daily_forecasts[date]["temp_max"] = max(
-                    daily_forecasts[date]["temp_max"], item["main"]["temp_max"]
-                )
+        for item in forecast_data["list"]:
+            date = datetime.fromtimestamp(item["dt"]).strftime("%Y-%m-%d")
+            if date not in daily_forecasts:
+                daily_forecasts[date] = {
+                    "temp_min": float("inf"),
+                    "temp_max": float("-inf"),
+                    "description": item["weather"][0]["description"],
+                    "icon": item["weather"][0]["icon"],
+                    "humidity": item["main"]["humidity"],
+                    "wind_speed": item["wind"]["speed"],
+                }
+            daily_forecasts[date]["temp_min"] = min(
+                daily_forecasts[date]["temp_min"], item["main"]["temp_min"]
+            )
+            daily_forecasts[date]["temp_max"] = max(
+                daily_forecasts[date]["temp_max"], item["main"]["temp_max"]
+            )
 
         return render_template(
             "weather.html",
