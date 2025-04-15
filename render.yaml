@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: solar-dashboard
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SOLAX_INVERTER_IP
+        sync: false
+      - key: MYENERGI_HUB_SN
+        sync: false
+      - key: MYENERGI_API_KEY
+        sync: false

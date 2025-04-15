@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solar Panel Dashboard</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      href="{{ url_for('static', filename='css/styles.css') }}"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="/">Solar Dashboard</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+          title="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link active" href="/">Home</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/weather">Weather</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/analytics">Analytics</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/predictions">Predictions</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="loading-overlay">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <div class="dashboard-header">
+      <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h1 class="mb-0">Real-time Monitoring</h1>
+            <p class="mb-0 opacity-75">Solar panel and energy system status</p>
+          </div>
+          <div class="last-update" id="lastUpdate"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" id="dashboardContent">
+      <!-- Solax Section -->
+      {% if solax_data.success %}
+      <h2 class="section-title mt-4">Solar Inverter</h2>
+      <!-- Main Power Stats -->
+      <div class="row">
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body text-center">
+              <div class="icon-circle">
+                <i class="fas fa-bolt"></i>
+              </div>
+              <p class="stat-label">Current Power Output</p>
+              <p class="value" id="acpower">
+                {% if solax_data.success and solax_data.data %} {{ '%.2f' %
+                (solax_data.data.acpower / 1000) }}<span class="unit">kW</span>
+                {% else %}
+                <span class="error">Error</span>
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body text-center">
+              <div class="icon-circle">
+                <i class="fas fa-sun"></i>
+              </div>
+              <p class="stat-label">Today's Yield</p>
+              <p class="value" id="yieldtoday">
+                {% if solax_data.success and solax_data.data %} {{
+                solax_data.data.yieldtoday }}<span class="unit">kWh</span>
+                {% else %}
+                <span class="error">Error</span>
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body text-center">
+              <div class="icon-circle">
+                <i class="fas fa-plug"></i>
+              </div>
+              <p class="stat-label">Grid Feed-in Power</p>
+              <p class="value" id="feedinpower">
+                {% if solax_data.success and solax_data.data %} {{ '%.2f' %
+                (solax_data.data.feedinpower / 1000) }}<span class="unit"
+                  >kW</span
+                >
+                {% else %}
+                <span class="error">Error</span>
+                {% endif %}
+              </p>
+              <div class="icon-circle small-icon" id="gridStatusIcon">
+                <i class="fas fa-arrow-up"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid and Battery Stats -->
+      <div class="row">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <i class="fas fa-plug me-2"></i>Grid Interaction
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <p class="stat-label">Total Feed-in Energy</p>
+                  <p class="value" id="feedinenergy">
+                    {% if solax_data.success and solax_data.data %} {{
+                    solax_data.data.feedinenergy }}<span class="unit">kWh</span>
+                    {% else %}
+                    <span class="error">Error</span>
+                    {% endif %}
+                  </p>
+                  <p class="stat-label">Feed-in Value</p>
+                  <p class="value" id="feedinvalue">
+                    {% if solax_data.success and solax_data.data %} €{{ '%.2f' %
+                    (solax_data.data.feedinenergy * 0.18) }} {% else %}
+                    <span class="error">Error</span>
+                    {% endif %}
+                  </p>
+                </div>
+                <div class="col-md-6">
+                  <p class="stat-label">Total Consumed Energy</p>
+                  <p class="value" id="consumeenergy">
+                    {% if solax_data.success and solax_data.data %} {{
+                    solax_data.data.consumeenergy }}<span class="unit"
+                      >kWh</span
+                    >
+                    {% else %}
+                    <span class="error">Error</span>
+                    {% endif %}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <i class="fas fa-battery-three-quarters me-2"></i>Battery Status
+            </div>
+            <div class="card-body">
+              {% if solax_data.success and solax_data.data and
+              solax_data.data.batStatus is not none %}
+              <div class="battery-gauge">
+                <div class="battery-container">
+                  <div class="battery-cap"></div>
+                  <div class="battery-level" id="batteryLevel"></div>
+                  <div class="battery-percentage" id="batteryPercentage">
+                    0%
+                  </div>
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-md-6">
+                  <p class="stat-label">Battery Power</p>
+                  <p class="value" id="battery-power">
+                    {% if solax_data.success and solax_data.data %} {{ '%.2f' %
+                    (solax_data.data.batPower / 1000) }}<span class="unit"
+                      >kW</span
+                    >
+                    {% else %}
+                    <span class="error">Error</span>
+                    {% endif %}
+                  </p>
+                  <p class="stat-label">Battery Direction</p>
+                  <p class="value" id="battery-direction">
+                    {% if solax_data.success and solax_data.data %} {% if
+                    solax_data.data.batPower > 0 %} Discharging {% else %}
+                    Charging {% endif %} {% else %}
+                    <span class="error">Error</span>
+                    {% endif %}
+                  </p>
+                </div>
+                <div class="col-md-6">
+                  <p class="stat-label">Battery Level</p>
+                  <p class="value" id="battery-level">
+                    {% if solax_data.success and solax_data.data %} {{
+                    solax_data.data.soc }}<span class="unit">%</span>
+                    {% else %}
+                    <span class="error">Error</span>
+                    {% endif %}
+                  </p>
+                </div>
+              </div>
+              {% else %}
+              <p class="text-center text-muted">No battery data available</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- MyEnergi Section -->
+      {% if myenergi_data.success %}
+      <h2 class="section-title mt-4">MyEnergi Devices</h2>
+
+      <!-- Eddi Section -->
+      {% if myenergi_data.eddi %}
+      <div class="card mt-4">
+        <div class="card-header">
+          <i class="fas fa-hot-tub me-2"></i>Eddi Water Heater
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <p class="stat-label">Charge Rate</p>
+              <p class="value" id="eddi-charge-rate">
+                {{ myenergi_data.eddi.charge_rate|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Green Amount Today</p>
+              <p class="value" id="eddi-green-amount">
+                {{ myenergi_data.eddi.green_amount_today|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Import Power</p>
+              <p class="value" id="eddi-import-power">
+                {{ myenergi_data.eddi.import_power|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Grid Power</p>
+              <p class="value" id="eddi-grid-power">
+                {{ myenergi_data.eddi.grid_power|default('N/A') }}
+              </p>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-6">
+              <p class="stat-label">Status</p>
+              <p class="value" id="eddi-status">
+                {{ myenergi_data.eddi.status|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-6">
+              <p class="stat-label">Last Updated</p>
+              <p class="value" id="eddi-time">
+                {{ myenergi_data.eddi.time|default('N/A') }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Zappi Section -->
+      {% if myenergi_data.zappi %}
+      <div class="card mt-4">
+        <div class="card-header">
+          <i class="fas fa-charging-station me-2"></i>Zappi Charger
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <p class="stat-label">Charge Speed</p>
+              <p class="value" id="zappi-charge-speed">
+                {{ myenergi_data.zappi.charge_speed|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Charge Rate</p>
+              <p class="value" id="zappi-charge-rate">
+                {{ myenergi_data.zappi.charge_rate|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Mode</p>
+              <p class="value" id="zappi-mode">
+                {{ myenergi_data.zappi.mode|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Status</p>
+              <p class="value" id="zappi-status">
+                {{ myenergi_data.zappi.status|default('N/A') }}
+              </p>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-3">
+              <p class="stat-label">Charge This Session</p>
+              <p class="value" id="zappi-charge-session">
+                {{ myenergi_data.zappi.che|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Calculated KMs Added</p>
+              <p class="value" id="zappi-kms">
+                {{ (myenergi_data.zappi.che|default(0)|float * 5)|round(1) }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Phase</p>
+              <p class="value" id="zappi-phase">
+                {{ myenergi_data.zappi.phase|default('N/A') }}
+              </p>
+            </div>
+            <div class="col-md-3">
+              <p class="stat-label">Last Updated</p>
+              <p class="value" id="zappi-time">
+                {{ myenergi_data.zappi.time|default('N/A') }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %} {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+  </body>
+</html>
