@@ -67,7 +67,6 @@ async function fetchData(days = 30) {
 
     return result.data;
   } catch (error) {
-    console.error("Error fetching data:", error);
     throw error;
   }
 }
@@ -83,13 +82,11 @@ function updateCharts(data) {
 function updateFinancialChart(data) {
   const canvas = document.getElementById("financial-chart");
   if (!canvas) {
-    console.error("Financial chart canvas not found");
     return;
   }
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    console.error("Could not get 2D context for financial chart");
     return;
   }
 
@@ -135,13 +132,11 @@ function updateFinancialChart(data) {
 function updateGenerationChart(data) {
   const canvas = document.getElementById("generation-chart");
   if (!canvas) {
-    console.error("Generation chart canvas not found");
     return;
   }
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    console.error("Could not get 2D context for generation chart");
     return;
   }
 
@@ -203,13 +198,11 @@ function updateGenerationChart(data) {
 function updatePredictionChart(data) {
   const canvas = document.getElementById("prediction-chart");
   if (!canvas) {
-    console.error("Prediction chart canvas not found");
     return;
   }
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    console.error("Could not get 2D context for prediction chart");
     return;
   }
 
@@ -310,7 +303,6 @@ async function loadData(days) {
     // Store data for export
     window.currentData = data;
   } catch (error) {
-    console.error("Error loading data:", error);
     // Show error message to user
     document.querySelectorAll(".chart-container").forEach((container) => {
       container.style.opacity = "1";
@@ -367,7 +359,6 @@ async function loadAnalyticsData(days) {
     updateSummaryDisplay(summaryData);
     updateCharts(responseData.data);
   } catch (error) {
-    console.error("Error loading analytics data:", error);
     showError("Failed to load analytics data. Please try again.");
   } finally {
     hideLoading();
@@ -395,13 +386,11 @@ function updateSummaryDisplay(data) {
 function updateGridChart(data) {
   const canvas = document.getElementById("grid-chart");
   if (!canvas) {
-    console.error("Grid chart canvas not found");
     return;
   }
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    console.error("Could not get 2D context for grid chart");
     return;
   }
 

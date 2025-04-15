@@ -71,21 +71,10 @@ async function updateSolaxData() {
   try {
     const response = await fetch("/api/solax/data");
     const data = await response.json();
-    console.log("Solax API Response:", data);
 
     // Check if the response indicates success
     if (data.success === true && data.data) {
       const solaxData = data.data;
-      console.log("Solax Data Details:", {
-        acpower: solaxData.acpower,
-        yieldtoday: solaxData.yieldtoday,
-        feedinpower: solaxData.feedinpower,
-        feedinenergy: solaxData.feedinenergy,
-        consumeenergy: solaxData.consumeenergy,
-        batStatus: solaxData.batStatus,
-        soc: solaxData.soc,
-        batPower: solaxData.batPower,
-      });
 
       // Update power values with proper units
       safelyUpdateElement(
@@ -138,40 +127,44 @@ async function updateSolaxData() {
       updateGridStatusIcon(solaxData.feedinpower);
     } else if (data.exception && data.exception.includes("Query success")) {
       // This is actually a success case with a misleading exception message
-      console.log("Solax API Success:", data.exception);
       // We don't have data to display, so show N/A
       safelyUpdateElement("acpower", "N/A");
       safelyUpdateElement("yieldtoday", "N/A");
       safelyUpdateElement("feedinpower", "N/A");
       safelyUpdateElement("feedinenergy", "N/A");
       safelyUpdateElement("consumeenergy", "N/A");
+      safelyUpdateElement("battery-status", "N/A");
+      safelyUpdateElement("battery-power", "N/A");
+      updateBatteryLevel(0);
     } else {
-      console.error("Solax API Error:", data.exception || "Unknown error");
       // Update UI to show error state
       safelyUpdateElement("acpower", "Error");
       safelyUpdateElement("yieldtoday", "Error");
       safelyUpdateElement("feedinpower", "Error");
       safelyUpdateElement("feedinenergy", "Error");
       safelyUpdateElement("consumeenergy", "Error");
+      safelyUpdateElement("battery-status", "Error");
+      safelyUpdateElement("battery-power", "Error");
+      updateBatteryLevel(0);
     }
   } catch (error) {
-    console.error("Error updating Solax data:", error);
     // Update UI to show error state
     safelyUpdateElement("acpower", "Error");
     safelyUpdateElement("yieldtoday", "Error");
     safelyUpdateElement("feedinpower", "Error");
     safelyUpdateElement("feedinenergy", "Error");
     safelyUpdateElement("consumeenergy", "Error");
+    safelyUpdateElement("battery-status", "Error");
+    safelyUpdateElement("battery-power", "Error");
+    updateBatteryLevel(0);
   }
 }
 
 // Function to fetch and update MyEnergi data
 async function updateMyEnergiData() {
   try {
-    console.log("Fetching MyEnergi data...");
     const response = await fetch("/api/myenergi/data");
     const data = await response.json();
-    console.log("MyEnergi API Response:", data);
 
     if (data.success) {
       // Update Eddi data if available
@@ -186,7 +179,6 @@ async function updateMyEnergiData() {
 
       // Update Zappi data if available
       if (data.zappi) {
-        console.log("Updating Zappi data:", data.zappi);
         safelyUpdateElement("zappi-charge-speed", data.zappi.charge_speed);
         safelyUpdateElement("zappi-charge-rate", data.zappi.charge_rate);
         safelyUpdateElement("zappi-mode", getZappiMode(data.zappi.mode));
@@ -198,14 +190,10 @@ async function updateMyEnergiData() {
         // Calculate and update KMs
         const kms = (parseFloat(data.zappi.che) || 0) * 5;
         safelyUpdateElement("zappi-kms", `${kms.toFixed(1)} km`);
-      } else {
-        console.log("No Zappi data available");
       }
-    } else {
-      console.error("MyEnergi API Error:", data.error || "Unknown error");
     }
   } catch (error) {
-    console.error("Error updating MyEnergi data:", error);
+    // Handle error silently
   }
 }
 
