@@ -9,17 +9,6 @@ import urllib.parse
 import json
 from myenergi_api import MyEnergiAPI
 from datetime import datetime
-from database import (
-    init_db,
-    import_csv_data,
-    get_all_data,
-    get_recent_data,
-    get_financial_summary,
-)
-from prediction import train_model, predict_next_days
-import pandas as pd
-import csv
-from io import StringIO
 
 # Configure logging
 logging.basicConfig(
@@ -50,10 +39,6 @@ OPENWEATHER_CITY = os.getenv("OPENWEATHER_CITY", "London,UK")
 
 # Initialize MyEnergi API client
 myenergi_client = MyEnergiAPI(MYENERGI_HUB_SN, MYENERGI_PASSWORD)
-
-# Initialize the database and import data
-init_db()
-import_csv_data("history_solar_data.csv")
 
 
 def fetch_with_digest_auth(url, method, username, password):
@@ -157,124 +142,15 @@ def fetch_with_digest_auth(url, method, username, password):
 
 def get_solax_data():
     """Fetch data from Solax API"""
-    try:
-        # Log the API configuration
-        logger.info(f"Using Solax API URL: {SOLAX_API_URL}")
-        logger.info(
-            f"Token ID length: {len(SOLAX_TOKEN_ID) if SOLAX_TOKEN_ID else 'None'}"
-        )
-        logger.info(
-            f"WiFi SN length: {len(SOLAX_WIFI_SN) if SOLAX_WIFI_SN else 'None'}"
-        )
+    # Prepare the request parameters
+    params = {"tokenId": SOLAX_TOKEN_ID, "sn": SOLAX_WIFI_SN}
 
-        # Prepare the request parameters
-        params = {"tokenId": SOLAX_TOKEN_ID, "sn": SOLAX_WIFI_SN}
+    # Make the request
+    response = requests.get(SOLAX_API_URL, params=params)
+    data = response.json()
 
-        # Log the full request URL with parameters
-        full_url = f"{SOLAX_API_URL}?tokenId={SOLAX_TOKEN_ID}&sn={SOLAX_WIFI_SN}"
-        logger.info(f"Full request URL: {full_url}")
-
-        response = requests.get(SOLAX_API_URL, params=params)
-        logger.info(f"Solax API response status: {response.status_code}")
-        logger.info(f"Solax API response headers: {dict(response.headers)}")
-        logger.info(f"Solax API raw response: {response.text}")
-
-        if response.status_code == 200:
-            try:
-                data = response.json()
-                logger.info(f"Parsed Solax API response: {json.dumps(data, indent=2)}")
-
-                # Check if the response indicates an error
-                if isinstance(data, dict):
-                    # Special case: "Query success!" message with "no auth!" result
-                    if (
-                        data.get("exception") == "Query success!"
-                        and data.get("result") == "no auth!"
-                    ):
-                        logger.warning(
-                            "Solax API authentication issue: 'no auth!' result"
-                        )
-                        return {
-                            "success": True,
-                            "data": {
-                                "acpower": 0,
-                                "yieldtoday": 0,
-                                "feedinpower": 0,
-                                "feedinenergy": 0,
-                                "consumeenergy": 0,
-                                "batStatus": 0,
-                                "soc": 0,
-                                "batPower": 0,
-                            },
-                            "auth_issue": True,
-                        }
-
-                    # Special case: "Query success!" message
-                    if data.get("exception") == "Query success!":
-                        logger.info("Solax API returned 'Query success!' message")
-                        return {
-                            "success": True,
-                            "data": {
-                                "acpower": 0,
-                                "yieldtoday": 0,
-                                "feedinpower": 0,
-                                "feedinenergy": 0,
-                                "consumeenergy": 0,
-                                "batStatus": 0,
-                                "soc": 0,
-                                "batPower": 0,
-                            },
-                        }
-
-                    if data.get("success", False) is False:
-                        error_msg = f"API returned error: {data.get('exception', 'Unknown error')}"
-                        logger.error(error_msg)
-                        return {"success": False, "exception": error_msg}
-
-                    if "result" in data and isinstance(data["result"], dict):
-                        result = data["result"]
-                        transformed_data = {
-                            "success": True,
-                            "data": {
-                                "acpower": result.get("acpower", 0),
-                                "yieldtoday": result.get("yieldtoday", 0),
-                                "feedinpower": result.get("feedinpower", 0),
-                                "feedinenergy": result.get("feedinenergy", 0),
-                                "consumeenergy": result.get("consumeenergy", 0),
-                                "batStatus": result.get("batStatus", 0),
-                                "soc": result.get("soc", 0),
-                                "batPower": result.get("batPower", 0),
-                            },
-                        }
-                        logger.info(
-                            f"Transformed Solax data: {json.dumps(transformed_data, indent=2)}"
-                        )
-                        return transformed_data
-                    else:
-                        error_msg = f"Missing or invalid 'result' in response: {data}"
-                        logger.error(error_msg)
-                        return {"success": False, "exception": error_msg}
-                else:
-                    error_msg = f"Unexpected response type: {type(data)}"
-                    logger.error(error_msg)
-                    return {"success": False, "exception": error_msg}
-            except json.JSONDecodeError as e:
-                error_msg = f"Failed to parse JSON response: {str(e)}"
-                logger.error(error_msg)
-                return {"success": False, "exception": error_msg}
-        else:
-            error_msg = f"API Error: {response.status_code}, Response: {response.text}"
-            logger.error(error_msg)
-            return {"success": False, "exception": error_msg}
-
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Request failed: {str(e)}"
-        logger.error(error_msg)
-        return {"success": False, "exception": error_msg}
-    except Exception as e:
-        error_msg = f"Unexpected error: {str(e)}"
-        logger.error(error_msg)
-        return {"success": False, "exception": error_msg}
+    # Return the data directly
+    return data
 
 
 def get_myenergi_data():
@@ -362,437 +238,108 @@ def index():
 
 
 @app.route("/api/solax/data")
-def get_solax_api_data():
+def solax_data():
     """API endpoint for Solax data"""
-    data = get_solax_data()
-    return jsonify(data)
+    return jsonify(get_solax_data())
 
 
 @app.route("/api/myenergi/data")
-def get_myenergi_api_data():
+def myenergi_data():
     """API endpoint for MyEnergi data"""
-    data = get_myenergi_data()
-    # Only log the success status and device counts
-    if data.get("success"):
-        eddi_count = len(data.get("data", {}).get("eddi", []))
-        zappi_count = len(data.get("data", {}).get("zappi", []))
-        logger.info(
-            f"MyEnergi data retrieved successfully: {eddi_count} Eddi, {zappi_count} Zappi devices"
-        )
-    return jsonify(data)
-
-
-# New routes for direct MyEnergi API access
-@app.route("/api/myenergi/cgi-all")
-def proxy_myenergi_all():
-    """Proxy endpoint for MyEnergi cgi-all endpoint"""
-    try:
-        # Use the same endpoint as in the working implementation
-        api_endpoint = "cgi-jstatus-*"
-        url = f"https://s18.myenergi.net/{api_endpoint}"
-        logger.info(f"Proxying request to: {url}")
-
-        # Use the same authentication method as in the working implementation
-        response = fetch_with_digest_auth(
-            url, request.method, MYENERGI_HUB_SN, MYENERGI_PASSWORD
-        )
-
-        if response is None:
-            logger.error("Failed to get response from MyEnergi API")
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Failed to get response from MyEnergi API",
-                    }
-                ),
-                500,
-            )
-
-        logger.info(f"Response status: {response.status_code}")
-
-        # Return the JSON response
-        try:
-            json_data = response.json()
-            return jsonify(json_data), response.status_code
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON response: {str(e)}")
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": f"Invalid JSON response: {str(e)}",
-                        "response_text": response.text[:200],
-                    }
-                ),
-                500,
-            )
-
-    except Exception as e:
-        logger.error(f"Proxy error: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route("/api/zappi-proxy")
-def proxy_zappi():
-    """Proxy endpoint for Zappi device"""
-    try:
-        url = "https://s18.myenergi.net/cgi-jstatus-Z16186743"
-        logger.info(f"Proxying Zappi request to: {url}")
-
-        response = fetch_with_digest_auth(
-            url, "GET", MYENERGI_HUB_SN, MYENERGI_PASSWORD
-        )
-
-        if response is None or not response.ok:
-            logger.error(
-                f"Failed to get Zappi data: {response.status_code if response else 'No response'}"
-            )
-            return jsonify({"success": False, "error": "Failed to get Zappi data"}), 500
-
-        json_data = response.json()
-        return jsonify(json_data), response.status_code
-
-    except Exception as e:
-        logger.error(f"Zappi proxy error: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route("/api/eddi-proxy")
-def proxy_eddi():
-    """Proxy endpoint for Eddi device"""
-    try:
-        url = "https://s18.myenergi.net/cgi-jstatus-E14303955"
-        logger.info(f"Proxying Eddi request to: {url}")
-
-        response = fetch_with_digest_auth(
-            url, "GET", MYENERGI_HUB_SN, MYENERGI_PASSWORD
-        )
-
-        if response is None or not response.ok:
-            logger.error(
-                f"Failed to get Eddi data: {response.status_code if response else 'No response'}"
-            )
-            return jsonify({"success": False, "error": "Failed to get Eddi data"}), 500
-
-        json_data = response.json()
-        return jsonify(json_data), response.status_code
-
-    except Exception as e:
-        logger.error(f"Eddi proxy error: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    return jsonify(get_myenergi_data())
 
 
 @app.route("/weather")
 def weather():
-    """Weather forecast page"""
-    try:
-        # Get current weather
-        current_url = f"https://api.openweathermap.org/data/2.5/weather?q={OPENWEATHER_CITY}&appid={OPENWEATHER_API_KEY}&units=metric"
-        current_response = requests.get(current_url)
-        current_data = current_response.json()
+    """Weather forecast route"""
+    current_weather = get_current_weather()
+    forecast = get_weather_forecast()
 
-        # Check if the current weather response is valid
-        if current_response.status_code != 200 or "weather" not in current_data:
-            logger.error(f"Invalid current weather response: {current_data}")
-            return render_template(
-                "weather.html", error="Failed to fetch current weather data"
-            )
-
-        # Get 5-day forecast
-        forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?q={OPENWEATHER_CITY}&appid={OPENWEATHER_API_KEY}&units=metric"
-        forecast_response = requests.get(forecast_url)
-        forecast_data = forecast_response.json()
-
-        # Check if the forecast response is valid
-        if forecast_response.status_code != 200 or "list" not in forecast_data:
-            logger.error(f"Invalid forecast response: {forecast_data}")
-            return render_template(
-                "weather.html", error="Failed to fetch forecast data"
-            )
-
-        # Process forecast data to group by day
-        daily_forecasts = {}
-        for item in forecast_data["list"]:
-            date = datetime.fromtimestamp(item["dt"]).strftime("%Y-%m-%d")
-            if date not in daily_forecasts:
-                daily_forecasts[date] = {
-                    "temp_min": float("inf"),
-                    "temp_max": float("-inf"),
-                    "description": item["weather"][0]["description"],
-                    "icon": item["weather"][0]["icon"],
-                    "humidity": item["main"]["humidity"],
-                    "wind_speed": item["wind"]["speed"],
-                }
-            daily_forecasts[date]["temp_min"] = min(
-                daily_forecasts[date]["temp_min"], item["main"]["temp_min"]
-            )
-            daily_forecasts[date]["temp_max"] = max(
-                daily_forecasts[date]["temp_max"], item["main"]["temp_max"]
-            )
-
+    if current_weather is None:
         return render_template(
             "weather.html",
-            current=current_data,
-            forecast=daily_forecasts,
+            error="Failed to fetch current weather data",
             city=OPENWEATHER_CITY,
         )
-    except Exception as e:
-        logger.error(f"Weather API Error: {str(e)}")
-        return render_template("weather.html", error=str(e))
 
-
-@app.route("/predictions")
-def predictions():
-    """Render the predictions page"""
-    return render_template("predictions.html")
-
-
-@app.route("/analytics")
-def analytics():
-    """Render the analytics page"""
-    return render_template("analytics.html")
-
-
-@app.route("/api/predictions")
-def get_predictions():
-    """Get solar generation predictions for the next N days"""
-    try:
-        days = int(request.args.get("days", 7))
-        predictions = predict_next_days(days)
-
-        # Calculate total generation and savings
-        total_generation = sum(p["generation"] for p in predictions)
-        total_savings = total_generation * 0.18  # 18 cents per kWh
-
-        return jsonify(
-            {
-                "success": True,
-                "total_generation": total_generation,
-                "total_savings": total_savings,
-                "confidence_level": 85,  # This could be calculated based on weather forecast accuracy
-                "daily_predictions": predictions,
-            }
+    if forecast is None:
+        return render_template(
+            "weather.html", error="Failed to fetch forecast data", city=OPENWEATHER_CITY
         )
-    except Exception as e:
-        logger.error(f"Error generating predictions: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template(
+        "weather.html",
+        current=current_weather,
+        forecast=forecast,
+        city=OPENWEATHER_CITY,
+    )
 
 
-@app.route("/api/analytics/summary")
-def get_analytics_summary():
-    """Get summary statistics for the analytics page"""
+@app.route("/api/weather/current")
+def weather_current():
+    """API endpoint for current weather"""
+    current_weather = get_current_weather()
+    if current_weather is None:
+        return jsonify({"success": False, "error": "Failed to fetch weather data"})
+    return jsonify({"success": True, "data": current_weather})
+
+
+@app.route("/api/weather/forecast")
+def weather_forecast():
+    """API endpoint for weather forecast"""
+    forecast = get_weather_forecast()
+    if forecast is None:
+        return jsonify({"success": False, "error": "Failed to fetch forecast data"})
+    return jsonify({"success": True, "data": forecast})
+
+
+def get_current_weather():
+    """Get current weather data from OpenWeatherMap API"""
     try:
-        days = int(request.args.get("days", 30))
-        data = get_recent_data(days)
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={OPENWEATHER_CITY}&appid={OPENWEATHER_API_KEY}&units=metric"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()  # Return the raw API response
+        else:
+            return None
+    except Exception as e:
+        logger.error(f"Error fetching current weather: {str(e)}")
+        return None
 
-        if data.empty:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data available for the selected period",
+
+def get_weather_forecast():
+    """Get 5-day weather forecast from OpenWeatherMap API"""
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/forecast?q={OPENWEATHER_CITY}&appid={OPENWEATHER_API_KEY}&units=metric"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            # Process forecast data to group by day
+            daily_forecasts = {}
+            for item in data["list"]:
+                date = datetime.fromtimestamp(item["dt"]).strftime("%Y-%m-%d")
+                if date not in daily_forecasts:
+                    daily_forecasts[date] = {
+                        "temp_min": item["main"]["temp_min"],
+                        "temp_max": item["main"]["temp_max"],
+                        "description": item["weather"][0]["description"],
+                        "icon": item["weather"][0]["icon"],
+                        "humidity": item["main"]["humidity"],
+                        "wind_speed": item["wind"]["speed"],
                     }
-                ),
-                404,
-            )
-
-        # Calculate summary statistics and convert to standard Python types
-        total_generation = float(data["generation"].fillna(0).sum())
-        avg_daily = float(data["generation"].fillna(0).mean())
-        total_savings = float(total_generation * 0.18)  # 18 cents per kWh
-
-        # Handle division by zero and NaN values for green percentage
-        generation = data["generation"].fillna(0)
-        grid_import = data["grid_import"].fillna(0)
-        total_energy = generation + grid_import
-        green_percentage = float(
-            ((generation / total_energy.replace(0, 1)) * 100).fillna(0).mean()
-        )
-
-        return jsonify(
-            {
-                "success": True,
-                "total_generation": round(total_generation, 2),
-                "avg_daily": round(avg_daily, 2),
-                "total_savings": round(total_savings, 2),
-                "green_percentage": round(green_percentage, 2),
-            }
-        )
+                else:
+                    daily_forecasts[date]["temp_min"] = min(
+                        daily_forecasts[date]["temp_min"], item["main"]["temp_min"]
+                    )
+                    daily_forecasts[date]["temp_max"] = max(
+                        daily_forecasts[date]["temp_max"], item["main"]["temp_max"]
+                    )
+            return daily_forecasts
+        else:
+            return None
     except Exception as e:
-        logger.error(f"Error getting analytics summary: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route("/api/solar-data")
-def get_solar_data():
-    """
-    Get historical solar data for a specified time period.
-    Query parameters:
-    - days (optional): Number of days of data to return (default: 30)
-    Returns:
-    - JSON object containing solar generation data
-    """
-    try:
-        days = request.args.get("days", default=30, type=int)
-        data = get_recent_data(days)
-
-        if data is None or data.empty:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data available for the specified period",
-                    }
-                ),
-                404,
-            )
-
-        # Convert DataFrame to list of dictionaries
-        formatted_data = []
-        for _, row in data.iterrows():
-            formatted_data.append(
-                {
-                    "date": row["date"].strftime("%Y-%m-%d"),
-                    "generation": (
-                        float(row["generation"]) if "generation" in row else 0
-                    ),
-                    "grid_import": (
-                        float(row["grid_import"]) if "grid_import" in row else 0
-                    ),
-                    "grid_export": (
-                        float(row["grid_export"]) if "grid_export" in row else 0
-                    ),
-                    "battery_charge": (
-                        float(row["battery_charge"]) if "battery_charge" in row else 0
-                    ),
-                    "battery_discharge": (
-                        float(row["battery_discharge"])
-                        if "battery_discharge" in row
-                        else 0
-                    ),
-                }
-            )
-
-        return jsonify({"success": True, "data": formatted_data})
-
-    except Exception as e:
-        logger.error(f"Error fetching solar data: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route("/api/solar-data/download")
-def download_solar_data():
-    """Download solar data as CSV for the specified time period"""
-    try:
-        days = request.args.get("days", default=30, type=int)
-        data = get_recent_data(days)
-
-        if data.empty:
-            return jsonify({"success": False, "error": "No data available"}), 404
-
-        # Create a string buffer to write CSV data
-        output = StringIO()
-        writer = csv.writer(output)
-
-        # Write header
-        writer.writerow(
-            [
-                "Date",
-                "Solar Production (kWh)",
-                "Grid Import (kWh)",
-                "Feed-in (kWh)",
-                "Battery Charge (kWh)",
-                "Battery Discharge (kWh)",
-                "Green Percentage (%)",
-                "Money Saved ($)",
-                "Feed-in Revenue ($)",
-                "Total Benefit ($)",
-            ]
-        )
-
-        # Write data rows
-        for i in range(len(data)):
-            generation = data["generation"].iloc[i]
-            grid_import = data["grid_import"].iloc[i]
-            grid_export = data["grid_export"].iloc[i]
-            battery_charge = data["battery_charge"].iloc[i]
-            battery_discharge = data["battery_discharge"].iloc[i]
-
-            # Calculate financial metrics
-            money_saved = generation * 0.18
-            feed_in_revenue = grid_export * 0.18
-            total_benefit = money_saved + feed_in_revenue
-
-            # Calculate green percentage
-            total_energy = generation + grid_import
-            green_percentage = (
-                (generation / total_energy * 100) if total_energy > 0 else 0
-            )
-
-            writer.writerow(
-                [
-                    data["date"].iloc[i].strftime("%Y-%m-%d"),
-                    round(generation, 2),
-                    round(grid_import, 2),
-                    round(grid_export, 2),
-                    round(battery_charge, 2),
-                    round(battery_discharge, 2),
-                    round(green_percentage, 2),
-                    round(money_saved, 2),
-                    round(feed_in_revenue, 2),
-                    round(total_benefit, 2),
-                ]
-            )
-
-        # Create the response
-        output.seek(0)
-        return Response(
-            output.getvalue(),
-            mimetype="text/csv",
-            headers={
-                "Content-Disposition": f"attachment; filename=solar_data_{days}days.csv"
-            },
-        )
-    except Exception as e:
-        logger.error(f"Error downloading solar data: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route("/api/solax/test")
-def test_solax_api():
-    """Test endpoint for Solax API connection"""
-    try:
-        # Log environment variables
-        logger.info("Environment variables:")
-        logger.info(f"SOLAX_TOKEN_ID: {SOLAX_TOKEN_ID}")
-        logger.info(f"SOLAX_WIFI_SN: {SOLAX_WIFI_SN}")
-
-        # Prepare the request parameters
-        params = {"tokenId": SOLAX_TOKEN_ID, "sn": SOLAX_WIFI_SN}
-
-        # Make the request
-        response = requests.get(SOLAX_API_URL, params=params)
-
-        return jsonify(
-            {
-                "status_code": response.status_code,
-                "headers": dict(response.headers),
-                "text": response.text,
-                "url": response.url,
-                "env_vars": {"token_id": SOLAX_TOKEN_ID, "wifi_sn": SOLAX_WIFI_SN},
-            }
-        )
-    except Exception as e:
-        return (
-            jsonify(
-                {
-                    "error": str(e),
-                    "env_vars": {"token_id": SOLAX_TOKEN_ID, "wifi_sn": SOLAX_WIFI_SN},
-                }
-            ),
-            500,
-        )
+        logger.error(f"Error fetching weather forecast: {str(e)}")
+        return None
 
 
 if __name__ == "__main__":

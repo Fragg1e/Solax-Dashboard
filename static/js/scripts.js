@@ -72,91 +72,124 @@ async function updateSolaxData() {
     const response = await fetch("/api/solax/data");
     const data = await response.json();
 
-    // Check if the response indicates success
-    if (data.success === true && data.data) {
-      const solaxData = data.data;
+    if (data.result && typeof data.result === "object") {
+      const solaxData = data.result;
 
       // Update power values with proper units
       safelyUpdateElement(
         "acpower",
-        solaxData.acpower
+        solaxData.acpower !== undefined
           ? `${formatNumber(solaxData.acpower / 1000)} kW`
           : "N/A"
       );
       safelyUpdateElement(
         "yieldtoday",
-        solaxData.yieldtoday
+        solaxData.yieldtoday !== undefined
           ? `${formatNumber(solaxData.yieldtoday)} kWh`
           : "N/A"
       );
       safelyUpdateElement(
         "feedinpower",
-        solaxData.feedinpower
+        solaxData.feedinpower !== undefined
           ? `${formatNumber(solaxData.feedinpower / 1000)} kW`
           : "N/A"
       );
       safelyUpdateElement(
         "feedinenergy",
-        solaxData.feedinenergy
+        solaxData.feedinenergy !== undefined
           ? `${formatNumber(solaxData.feedinenergy)} kWh`
           : "N/A"
       );
       safelyUpdateElement(
         "consumeenergy",
-        solaxData.consumeenergy
+        solaxData.consumeenergy !== undefined
           ? `${formatNumber(solaxData.consumeenergy)} kWh`
           : "N/A"
       );
 
-      // Update battery information if available
-      if (solaxData.batStatus !== undefined && solaxData.soc !== undefined) {
+      // Calculate and update feed-in value (0.18€ per kWh)
+      const feedInValue = solaxData.feedinenergy * 0.18;
+      safelyUpdateElement("feedinvalue", `€${formatNumber(feedInValue)}`);
+
+      // Update battery information
+      if (solaxData.soc !== undefined) {
         updateBatteryLevel(solaxData.soc);
-        safelyUpdateElement(
-          "battery-status",
-          solaxData.batStatus === 1 ? "Charging" : "Discharging"
-        );
+
+        // Update battery status text
+        const batteryStatus = document.getElementById("battery-status");
+        if (batteryStatus) {
+          if (solaxData.batPower > 0) {
+            batteryStatus.textContent = "Discharging";
+          } else if (solaxData.batPower < 0) {
+            batteryStatus.textContent = "Charging";
+          } else {
+            batteryStatus.textContent = "Idle";
+          }
+        }
+
+        // Update battery power
         safelyUpdateElement(
           "battery-power",
-          solaxData.batPower
-            ? `${formatNumber(solaxData.batPower / 1000)} kW`
+          solaxData.batPower !== undefined
+            ? `${formatNumber(Math.abs(solaxData.batPower / 1000))} kW`
             : "N/A"
         );
+      } else {
+        // No battery data available
+        const batteryStatusCard = document.querySelector(
+          ".battery-status-card"
+        );
+        if (batteryStatusCard) {
+          const noDataMessage = document.createElement("p");
+          noDataMessage.textContent = "No battery data available";
+          noDataMessage.className = "text-center text-muted";
+          batteryStatusCard.innerHTML = "";
+          batteryStatusCard.appendChild(noDataMessage);
+        }
       }
 
       // Update grid status
-      updateGridStatusIcon(solaxData.feedinpower);
-    } else if (data.exception && data.exception.includes("Query success")) {
-      // This is actually a success case with a misleading exception message
-      // We don't have data to display, so show N/A
+      updateGridStatusIcon(solaxData.feedinpower, "solax");
+
+      // Update last update time
+      updateLastUpdateTime();
+    } else {
+      // Handle error state
       safelyUpdateElement("acpower", "N/A");
       safelyUpdateElement("yieldtoday", "N/A");
       safelyUpdateElement("feedinpower", "N/A");
       safelyUpdateElement("feedinenergy", "N/A");
       safelyUpdateElement("consumeenergy", "N/A");
-      safelyUpdateElement("battery-status", "N/A");
-      safelyUpdateElement("battery-power", "N/A");
-      updateBatteryLevel(0);
-    } else {
-      // Update UI to show error state
-      safelyUpdateElement("acpower", "Error");
-      safelyUpdateElement("yieldtoday", "Error");
-      safelyUpdateElement("feedinpower", "Error");
-      safelyUpdateElement("feedinenergy", "Error");
-      safelyUpdateElement("consumeenergy", "Error");
-      safelyUpdateElement("battery-status", "Error");
-      safelyUpdateElement("battery-power", "Error");
-      updateBatteryLevel(0);
+      safelyUpdateElement("feedinvalue", "N/A");
+
+      // Update battery status to show no data
+      const batteryStatusCard = document.querySelector(".battery-status-card");
+      if (batteryStatusCard) {
+        const noDataMessage = document.createElement("p");
+        noDataMessage.textContent = "No battery data available";
+        noDataMessage.className = "text-center text-muted";
+        batteryStatusCard.innerHTML = "";
+        batteryStatusCard.appendChild(noDataMessage);
+      }
     }
   } catch (error) {
-    // Update UI to show error state
+    // Handle error state
     safelyUpdateElement("acpower", "Error");
     safelyUpdateElement("yieldtoday", "Error");
     safelyUpdateElement("feedinpower", "Error");
     safelyUpdateElement("feedinenergy", "Error");
     safelyUpdateElement("consumeenergy", "Error");
-    safelyUpdateElement("battery-status", "Error");
-    safelyUpdateElement("battery-power", "Error");
-    updateBatteryLevel(0);
+    safelyUpdateElement("feedinvalue", "Error");
+
+    // Update battery status to show error
+    const batteryStatusCard = document.querySelector(".battery-status-card");
+    if (batteryStatusCard) {
+      const errorMessage = document.createElement("p");
+      errorMessage.textContent = "Error loading battery data";
+      errorMessage.className = "text-center text-danger";
+      batteryStatusCard.innerHTML = "";
+      batteryStatusCard.appendChild(errorMessage);
+    }
   }
 }
 
